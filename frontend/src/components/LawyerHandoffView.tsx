@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { LawyerHandoffPack } from '../types';
 import { Share2, Download, Printer, ShieldCheck, CheckSquare, Calendar, HelpCircle, FileText, Scale } from 'lucide-react';
 
-export const LawyerHandoffView: React.FC = () => {
+interface LawyerHandoffViewProps {
+  getAuthToken?: () => string;
+}
+
+export const LawyerHandoffView: React.FC<LawyerHandoffViewProps> = ({ getAuthToken }) => {
   const [pack, setPack] = useState<LawyerHandoffPack | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -13,15 +17,19 @@ export const LawyerHandoffView: React.FC = () => {
   const fetchHandoff = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('lawpedia_token') || '';
+      const token = (getAuthToken ? getAuthToken() : '') || localStorage.getItem('lawpedia_token') || '';
       const res = await fetch('/api/handoff', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      const data = await res.json();
-      setPack(data);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.parties_involved)) {
+          setPack(data);
+        }
+      }
     } catch (err) {
       console.error(err);
     } finally {

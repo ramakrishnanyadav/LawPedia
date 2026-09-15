@@ -6,26 +6,36 @@ interface GraphData {
   edges: { source: string; target: string; relationship: string }[];
 }
 
-export const EvidenceGraphView: React.FC = () => {
+interface EvidenceGraphViewProps {
+  getAuthToken?: () => string;
+}
+
+export const EvidenceGraphView: React.FC<EvidenceGraphViewProps> = ({ getAuthToken }) => {
   const [graph, setGraph] = useState<GraphData | null>(null);
   const [viewMode, setViewMode] = useState<'visual' | 'table'>('visual');
   const [selectedNode, setSelectedNode] = useState<any | null>(null);
 
   useEffect(() => {
+    const token = (getAuthToken ? getAuthToken() : '') || localStorage.getItem('lawpedia_token') || '';
     fetch('/api/graph', {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('lawpedia_token') || ''}`
+        'Authorization': `Bearer ${token}`
       }
     })
-      .then((res) => res.json())
+      .then((res) => {
+        if (res.ok) return res.json();
+        return null;
+      })
       .then((data) => {
-        setGraph(data);
-        if (data.nodes && data.nodes.length > 0) {
-          setSelectedNode(data.nodes[0]);
+        if (data && Array.isArray(data.nodes)) {
+          setGraph(data);
+          if (data.nodes.length > 0) {
+            setSelectedNode(data.nodes[0]);
+          }
         }
       })
       .catch((err) => console.error(err));
-  }, []);
+  }, [getAuthToken]);
 
 
   return (

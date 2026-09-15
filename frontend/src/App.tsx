@@ -202,7 +202,7 @@ export function App() {
           </div>
         )}
 
-        {activeTab === 'handoff' && <LawyerHandoffView />}
+        {activeTab === 'handoff' && <LawyerHandoffView getAuthToken={getAuthToken} />}
         {activeTab === 'security' && <SecurityMetricsDashboard />}
       </main>
 
