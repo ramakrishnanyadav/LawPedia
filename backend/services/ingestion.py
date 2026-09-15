@@ -35,14 +35,14 @@ class IngestionService:
         title_match = re.search(r"^(?:CONTRACT|AGREEMENT|POLICY|MASTER SERVICES AGREEMENT|LEASE AGREEMENT|NON-DISCLOSURE AGREEMENT)[:\s]+([^\n]+)", content_text, re.IGNORECASE)
         doc_title = title_match.group(1).strip() if title_match else filename.replace(".pdf", "").replace(".txt", "").replace("_", " ").title()
 
-        parties = list({p for p in re.findall(r"\b(?:Party A|Party B|Company|Client|Vendor|Contractor|Employer|Employee|Licensor|Licensee|Landlord|Tenant|Disclosing Party|Receiving Party)\b", content_text, re.IGNORECASE)})
+        parties = list(set(re.findall(r"\b(?:Party A|Party B|Company|Client|Vendor|Contractor|Employer|Employee|Licensor|Licensee|Landlord|Tenant|Disclosing Party|Receiving Party)\b", content_text, re.IGNORECASE)))
         if not parties:
             parties = ["Party A", "Party B"]
 
-        jurisdiction_match = re.search(r"governed by the laws of (?:the State of |the Republic of )?([A-Za-z\s]+)", content_text, re.IGNORECASE)
+        jurisdiction_match = re.search(r"governed by the laws of (?:the State of |the Republic of )?([a-z\s]+)", content_text, re.IGNORECASE)
         jurisdiction = jurisdiction_match.group(1).strip() if jurisdiction_match else "General"
 
-        effective_date_match = re.search(r"effective as of ([A-Za-z0-9,\s]+|\d{4}-\d{2}-\d{2})", content_text, re.IGNORECASE)
+        effective_date_match = re.search(r"effective as of ([a-z0-9,\s]+|\d{4}-\d{2}-\d{2})", content_text, re.IGNORECASE)
         effective_date = effective_date_match.group(1).strip() if effective_date_match else "2026-01-01"
 
         return doc_title, parties, jurisdiction, effective_date
@@ -80,7 +80,7 @@ class IngestionService:
             sec_lines = sec_text.split("\n", 1)
             header_line = sec_lines[0].strip()
 
-            sec_title_match = re.match(r"^((?:SECTION|CLAUSE|\d+\.|\d+\))\s*[A-Za-z0-9.\s_:-]+)", header_line, re.IGNORECASE)
+            sec_title_match = re.match(r"^((?:SECTION|CLAUSE|\d+\.|\d+\))\s*[a-z0-9.\s_:-]+)", header_line, re.IGNORECASE)
             sec_title = sec_title_match.group(1).strip() if sec_title_match else f"Clause {clause_idx}"
             
             clause_id = f"CLAUSE_{doc_id}_{clause_idx:03d}"

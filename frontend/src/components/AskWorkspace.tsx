@@ -159,18 +159,11 @@ export const AskWorkspace: React.FC<AskWorkspaceProps> = ({ onRunQuery }) => {
               </h3>
               <div className="space-y-3">
                 {response.claims.map((c) => (
-                  <div
+                  <button
+                    type="button"
                     key={c.claim_id}
-                    role="button"
-                    tabIndex={0}
                     onClick={() => c.evidence && setSelectedSpan(c.evidence)}
-                    onKeyDown={(e) => {
-                      if ((e.key === 'Enter' || e.key === ' ') && c.evidence) {
-                        e.preventDefault();
-                        setSelectedSpan(c.evidence);
-                      }
-                    }}
-                    className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                    className={`w-full text-left p-4 rounded-xl border transition-all cursor-pointer ${
                       selectedSpan?.clause_id === c.evidence?.clause_id
                         ? 'bg-blue-50/80 border-blue-500 shadow-sm'
                         : 'bg-slate-50/50 border-slate-200 hover:border-slate-300'
@@ -186,7 +179,7 @@ export const AskWorkspace: React.FC<AskWorkspaceProps> = ({ onRunQuery }) => {
                         {renderStatusBadge(c.support_status)}
                       </div>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>

@@ -12,11 +12,9 @@ RUN npm run build
 FROM python:3.11-slim AS runner
 WORKDIR /app
 
-# Create non-root user
-RUN groupadd -g 1001 appuser && useradd -u 1001 -g appuser -m appuser
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Create non-root user and install system dependencies
+RUN groupadd -g 1001 appuser && useradd -u 1001 -g appuser -m appuser \
+    && apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     && rm -rf /var/lib/apt/lists/*

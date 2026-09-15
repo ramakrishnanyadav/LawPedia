@@ -100,18 +100,11 @@ export const EvidenceGraphView: React.FC<EvidenceGraphViewProps> = ({ getAuthTok
             {/* Simulated 3D Mesh Nodes */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 my-6">
               {graph.nodes.slice(0, 9).map((node) => (
-                <div
+                <button
+                  type="button"
                   key={node.id}
-                  role="button"
-                  tabIndex={0}
                   onClick={() => setSelectedNode(node)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setSelectedNode(node);
-                    }
-                  }}
-                  className={`p-4 rounded-xl border transition-all cursor-pointer space-y-1.5 ${
+                  className={`text-left p-4 rounded-xl border transition-all cursor-pointer space-y-1.5 ${
                     selectedNode?.id === node.id
                       ? 'bg-blue-50 border-blue-500 shadow-md'
                       : 'bg-slate-50/70 border-slate-200 hover:border-blue-300 hover:bg-white'
@@ -125,7 +118,7 @@ export const EvidenceGraphView: React.FC<EvidenceGraphViewProps> = ({ getAuthTok
                   </div>
                   <h4 className="font-bold text-xs text-slate-900 truncate">{node.label}</h4>
                   {node.text && <p className="text-[11px] text-slate-500 line-clamp-2 italic">{node.text}</p>}
-                </div>
+                </button>
               ))}
             </div>
 

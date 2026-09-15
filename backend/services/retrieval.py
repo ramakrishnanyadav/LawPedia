@@ -22,7 +22,7 @@ def get_sentence_model():
         try:
             from sentence_transformers import SentenceTransformer
             _MODEL_INSTANCE = SentenceTransformer("all-MiniLM-L6-v2")
-        except (Exception, MemoryError) as e:
+        except Exception as e:
             print("Notice: SentenceTransformer unavailable or memory limit reached, falling back to 384-dim dense vectorizer:", e)
             _MODEL_INSTANCE = False
     return _MODEL_INSTANCE if _MODEL_INSTANCE is not False else None

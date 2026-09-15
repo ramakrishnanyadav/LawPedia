@@ -49,8 +49,12 @@ class LegalExtractionService:
         cond_match = re.search(r"\b(if|provided that|subject to|in the event of)\s+([^,.;]+)", sent_clean, re.IGNORECASE)
         cond_text = cond_match.group(0).strip() if cond_match else None
 
-        deadline_match = re.search(r"\bwithin \d+ (?:days?|months?|years?)\b|\bprior to [^,.;]+|\bno later than [^,.;]+", sent_clean, re.IGNORECASE)
-        deadline = deadline_match.group(0).strip() if deadline_match else None
+        deadline = None
+        for pat in (r"\bwithin \d+ (?:days?|months?|years?)\b", r"\bprior to [^,.;]+", r"\bno later than [^,.;]+"):
+            m = re.search(pat, sent_clean, re.IGNORECASE)
+            if m:
+                deadline = m.group(0).strip()
+                break
 
         penalty_match = re.search(r"\b(?:penalty|cure period|late fee|liquidated damages) of [^,.;]+|\binterest at \d+%", sent_clean, re.IGNORECASE)
         penalty = penalty_match.group(0).strip() if penalty_match else None
