@@ -6,7 +6,8 @@ from typing import Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, Depends
 from backend.schemas.eglr import (
     AskQueryRequest, AskQueryResponse, DocumentUploadResponse,
-    ComparisonResult, LawyerHandoffPack, SupportStatus, ClaimVerification, FalsePremiseCheck
+    ComparisonResult, LawyerHandoffPack, SupportStatus, ClaimVerification, FalsePremiseCheck,
+    PlainEnglishChecklist
 )
 from backend.services.ingestion import IngestionService
 from backend.services.extraction import LegalExtractionService
@@ -224,6 +225,8 @@ def ask_question(
     verified_claims = ClaimVerificationEngine.verify_claims(raw_claims, spans)
 
     overall_status = SupportStatus.SUPPORTED if all(c.support_status == SupportStatus.SUPPORTED for c in verified_claims) else SupportStatus.PARTIALLY_SUPPORTED
+    jurisdiction = primary_span.jurisdiction or "General"
+    statutory_caveat = f"Note: This analysis does not account for {jurisdiction}-specific statutory overrides or mandatory local regulations."
 
     return AskQueryResponse(
         query=request.query,
@@ -231,10 +234,13 @@ def ask_question(
         claims=verified_claims,
         support_status=overall_status,
         false_premise_check=fp_check,
-        important_conditions=["Terms subject to active effective dates and governing jurisdiction."],
+        important_conditions=[
+            "Terms subject to active effective dates and governing jurisdiction.",
+            statutory_caveat
+        ],
         conflicts_or_uncertainty=["Verify if any subsequent side-letter or amendment modifies these terms."],
         practical_next_steps=["Review full clause excerpt in Clause Explorer.", "Export Lawyer Handoff Pack for counsel review."],
-        questions_to_ask_lawyer=["Does this specific provision meet statutory compliance requirements in your state?"],
+        questions_to_ask_lawyer=[f"Does this specific provision meet statutory compliance requirements in {jurisdiction}?"],
         evidence_spans=spans,
         legal_disclaimer=SafetyGateway.MANDATORY_LEGAL_DISCLAIMER
     )
@@ -286,10 +292,25 @@ def generate_handoff(user: AuthenticatedUser = Depends(verify_firebase_token)):
     return LawyerHandoffService.generate_handoff_pack(tenant_docs, tenant_clauses, spans)
 
 
+@router.api_route("/checklist", methods=["GET", "POST"], response_model=PlainEnglishChecklist)
+def generate_checklist(user: AuthenticatedUser = Depends(verify_firebase_token)):
+    """
+    Generates plain-English actionable checklist (things to negotiate, dates not to miss, risk red flags).
+    """
+    tenant_id = user.tenant_id
+    tenant_docs = [meta for meta in documents_store.values() if meta.tenant_id == tenant_id]
+    tenant_clauses = []
+    for d in tenant_docs:
+        tenant_clauses.extend(clauses_store.get(d.document_id, []))
+
+    return LawyerHandoffService.generate_plain_english_checklist(tenant_docs, tenant_clauses)
+
+
 @router.get("/audit")
 def get_audit(user: AuthenticatedUser = Depends(verify_firebase_token)):
     """
     Returns audit logs for verified tenant isolation.
     """
     return {"audit_logs": get_audit_logs(user.tenant_id)}
+
 

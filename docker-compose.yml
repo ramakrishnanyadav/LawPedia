@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  lawpedia-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lawpedia-app
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - ENV=development
+      - DEBUG=True
+      - LAWPEDIA_SECRET_KEY=lawpedia-production-proof-secret-key-2026-v2
+      - LAWPEDIA_DEMO_MODE=true
+      - LAWPEDIA_DEMO_TOKEN=lawpedia_demo_token_2026
+    volumes:
+      - ./backend/data:/app/backend/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+# Production Deployment Note:
+# For production multi-tenant scale, swap SQLite file storage for PostgreSQL:
+# 1. Add postgres service container below:
+#    postgres:
+#      image: postgres:15-alpine
+#      environment:
+#        POSTGRES_DB: lawpedia
+#        POSTGRES_USER: lawpedia_user
+#        POSTGRES_PASSWORD: secret_password
+# 2. Update backend/services/db.py to use SQLAlchemy / psycopg2 postgres driver.

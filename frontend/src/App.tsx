@@ -11,7 +11,7 @@ import { CommandPalette } from './components/CommandPalette';
 import { AccessibilityPreferences, AccessibilitySettings } from './components/AccessibilityPreferences';
 import { AuthModal } from './components/AuthModal';
 import { UserProfile, DEMO_USER } from './config/firebase';
-import { Calendar } from 'lucide-react';
+import { Calendar, AlertTriangle } from 'lucide-react';
 
 const DEFAULT_A11Y_SETTINGS: AccessibilitySettings = {
   textScale: 100,
@@ -44,7 +44,7 @@ export function App() {
     }
   }, []);
 
-  const getAuthToken = () => user?.token || "lawpedia_demo_token_2026";
+  const getAuthToken = () => user?.token || "";
 
   const fetchDocuments = async () => {
     try {
@@ -124,6 +124,14 @@ export function App() {
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         onOpenAccessibility={() => setIsA11yModalOpen(true)}
       />
+
+      {/* Persistent Legal Assistance Disclaimer Banner */}
+      <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-xs text-amber-900 font-medium flex items-center justify-center gap-2 text-center">
+        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+        <span>
+          <strong>LawPedia Legal Information Notice:</strong> LawPedia provides AI-assisted document navigation and evidence extraction for informational purposes only and does not constitute formal legal advice.
+        </span>
+      </div>
 
       <AuthModal
         isOpen={isAuthModalOpen}

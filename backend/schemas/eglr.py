@@ -29,6 +29,7 @@ class EvidenceSpan(BaseModel):
     section: str = Field(default="General", description="Section title in document")
     clause_id: str = Field(..., description="Unique identifier of clause")
     evidence_span: str = Field(..., description="Exact textual excerpt from document")
+    citation: str = Field(default="", description="Formatted section and page citation reference e.g. Section 4.2, page 3")
     document_version: str = Field(default="v1.0", description="Document version string")
     effective_date: Optional[str] = Field(default=None, description="Effective date ISO format")
     jurisdiction: Optional[str] = Field(default="General", description="Governing jurisdiction")
@@ -92,6 +93,7 @@ class ComparisonItem(BaseModel):
     doc_b_clause: Optional[str] = None
     doc_a_text: Optional[str] = None
     doc_b_text: Optional[str] = None
+    side_by_side_delta: Optional[str] = None
     analysis: str
     risk_impact: RiskLevel = RiskLevel.LOW
 
@@ -153,3 +155,21 @@ class DocumentUploadResponse(BaseModel):
     status: str
     clause_count: int
     metadata: DocumentMetadata
+
+
+class ChecklistItem(BaseModel):
+    category: str  # "NEGOTIATE", "DEADLINE", "RED_FLAG", "ACTION_ITEM"
+    title: str
+    description: str
+    clause_reference: Optional[str] = None
+    urgency: str = "MEDIUM"
+
+
+class PlainEnglishChecklist(BaseModel):
+    checklist_id: str
+    generated_at: str
+    things_to_negotiate: list[ChecklistItem] = Field(default_factory=list)
+    dates_not_to_miss: list[ChecklistItem] = Field(default_factory=list)
+    risk_red_flags: list[ChecklistItem] = Field(default_factory=list)
+    action_items: list[str] = Field(default_factory=list)
+

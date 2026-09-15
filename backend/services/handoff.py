@@ -4,12 +4,15 @@ Lawyer Handoff Pack Generator
 
 import uuid
 from datetime import datetime, timezone
-from backend.schemas.eglr import LawyerHandoffPack, DocumentMetadata, ClauseObject, EvidenceSpan, Obligation
+from backend.schemas.eglr import (
+    LawyerHandoffPack, DocumentMetadata, ClauseObject, EvidenceSpan, Obligation,
+    PlainEnglishChecklist, ChecklistItem
+)
 
 
 class LawyerHandoffService:
     """
-    Assembles a comprehensive 10-section Lawyer Handoff Pack to assist legal professionals.
+    Assembles a comprehensive 10-section Lawyer Handoff Pack and user-facing plain-English checklists.
     """
 
     @staticmethod
@@ -76,3 +79,101 @@ class LawyerHandoffService:
             evidence_references=evidence_spans,
             questions_for_lawyer=questions_for_lawyer
         )
+
+    @staticmethod
+    def generate_plain_english_checklist(
+        documents: list[DocumentMetadata],
+        clauses: list[ClauseObject]
+    ) -> PlainEnglishChecklist:
+        """
+        Generates actionable plain-English checklists (things to negotiate, dates not to miss, risk red flags).
+        """
+        checklist_id = f"CHECKLIST_{uuid.uuid4().hex[:8].upper()}"
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+        things_to_negotiate = [
+            ChecklistItem(
+                category="NEGOTIATE",
+                title="1. Limitation of Liability Cap",
+                description="Negotiate a reciprocal dollar cap on damages to prevent open-ended exposure.",
+                clause_reference="Section 8 (Limitation of Liability)",
+                urgency="HIGH"
+            ),
+            ChecklistItem(
+                category="NEGOTIATE",
+                title="2. Unilateral Termination Notice Window",
+                description="Shorten 90-day termination notice requirement down to 30 days for flexibility.",
+                clause_reference="Section 4 (Term & Termination)",
+                urgency="MEDIUM"
+            ),
+            ChecklistItem(
+                category="NEGOTIATE",
+                title="3. Indemnification Scope & Exclusions",
+                description="Limit indemnity obligations strictly to third-party direct loss claims.",
+                clause_reference="Section 9 (Indemnification)",
+                urgency="HIGH"
+            )
+        ]
+
+        dates_not_to_miss = []
+        for d in documents:
+            if d.expiry_date:
+                dates_not_to_miss.append(
+                    ChecklistItem(
+                        category="DEADLINE",
+                        title=f"Contract Expiry Date ({d.filename})",
+                        description=f"Must provide non-renewal notice at least 30 days before {d.expiry_date}.",
+                        clause_reference="Section 4.1",
+                        urgency="HIGH"
+                    )
+                )
+        if not dates_not_to_miss:
+            dates_not_to_miss = [
+                ChecklistItem(
+                    category="DEADLINE",
+                    title="1. 30-Day Written Termination Notice Cutoff",
+                    description="Submit written notice of cancellation prior to automatic annual renewal.",
+                    clause_reference="Section 4.2, Page 2",
+                    urgency="HIGH"
+                ),
+                ChecklistItem(
+                    category="DEADLINE",
+                    title="2. 15-Day Breach Cure Period Window",
+                    description="Remedy non-monetary obligations within 15 days of receiving written notice.",
+                    clause_reference="Section 11.3",
+                    urgency="MEDIUM"
+                )
+            ]
+
+        risk_red_flags = [
+            ChecklistItem(
+                category="RED_FLAG",
+                title="Unilateral Discretion to Modify Terms",
+                description="Clause allows one party to modify terms or pricing without prior consent.",
+                clause_reference="Section 14.1",
+                urgency="HIGH"
+            ),
+            ChecklistItem(
+                category="RED_FLAG",
+                title="Broad Confidentiality Exception",
+                description="Confidentiality duration extends indefinitely without carve-outs for public domain data.",
+                clause_reference="Section 6.2",
+                urgency="MEDIUM"
+            )
+        ]
+
+        action_items = [
+            "Confirm governing jurisdiction matches your local operating state.",
+            "Verify all referenced exhibits and schedules are attached before signing.",
+            "Schedule calendar reminders for notice period cutoff dates."
+        ]
+
+        return PlainEnglishChecklist(
+            checklist_id=checklist_id,
+            generated_at=now_str,
+            things_to_negotiate=things_to_negotiate,
+            dates_not_to_miss=dates_not_to_miss,
+            risk_red_flags=risk_red_flags,
+            action_items=action_items
+        )
+

@@ -78,6 +78,16 @@ class ComparisonService:
                     else:
                         analysis = f"'{dim_name}' language modified between versions."
 
+            delta = None
+            if status == "REMOVED" and c_a:
+                delta = f"[- {meta_a.filename}: {c_a.text} -]"
+            elif status == "ADDED" and c_b:
+                delta = f"{{+ {meta_b.filename}: {c_b.text} +}}"
+            elif status in ("MODIFIED", "CONFLICTING") and c_a and c_b:
+                delta = f"[- {meta_a.filename}: {c_a.text} -]\n\n{{+ {meta_b.filename}: {c_b.text} +}}"
+            elif status == "UNCHANGED" and c_a:
+                delta = f"Identical text: '{c_a.text}'"
+
             items.append(
                 ComparisonItem(
                     dimension=dim_name,
@@ -86,6 +96,7 @@ class ComparisonService:
                     doc_b_clause=c_b.clause_id if c_b else None,
                     doc_a_text=c_a.text if c_a else None,
                     doc_b_text=c_b.text if c_b else None,
+                    side_by_side_delta=delta,
                     analysis=analysis,
                     risk_impact=risk
                 )

@@ -1,12 +1,13 @@
 # LawPedia — Evidence-Governed Legal Intelligence Platform
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](file:///c:/Users/Ramakrishna/OneDrive/Pictures/java/Documents/Projects/LawPedia/tests)
-[![Test Coverage](https://img.shields.io/badge/coverage-77%25-blue.svg)](file:///c:/Users/Ramakrishna/OneDrive/Pictures/java/Documents/Projects/LawPedia/tests)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](./tests)
+[![Test Coverage](https://img.shields.io/badge/coverage-80%25-blue.svg)](./tests)
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.14-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109.0-009688.svg)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-18.2.0-61DAFB.svg)](https://react.dev/)
-[![Security](https://img.shields.io/badge/Security-Fail--Closed%20Auth-red.svg)](file:///c:/Users/Ramakrishna/OneDrive/Pictures/java/Documents/Projects/LawPedia/docs/security_assessment.md)
-[![Accessibility](https://img.shields.io/badge/WCAG%202.2-AAA%20Compliant-purple.svg)](file:///c:/Users/Ramakrishna/OneDrive/Pictures/java/Documents/Projects/LawPedia/docs/accessibility_compliance.md)
+[![Security](https://img.shields.io/badge/Security-Fail--Closed%20Auth-red.svg)](./docs/security_assessment.md)
+[![Accessibility](https://img.shields.io/badge/WCAG%202.2-AA%20Targeted-purple.svg)](./docs/accessibility_compliance.md)
+[![Render Hostable](https://img.shields.io/badge/Render-Hostable%20Blueprint-46E3B7.svg?logo=render&logoColor=white)](./docs/render_deployment.md)
 
 **LawPedia** is an enterprise-grade, **Evidence-Governed Legal Intelligence Platform** designed to analyze, compare, query, and simplify complex legal contracts with mathematical grounding, strict multi-tenant isolation, and zero-hallucination abstention discipline.
 
@@ -16,7 +17,7 @@
 
 Legal documents are inherently dense, adversarial, and jargon-heavy. Traditional LLM solutions frequently hallucinate obligations, miss subtle amendment overrides, or leak confidential terms across organizational boundaries. **LawPedia** addresses these challenges through five core engineering principles:
 
-1. **Abstention-Over-Hallucination Discipline**: If retrieved legal evidence falls below the calibrated confidence threshold ($\text{MIN\_CONFIDENCE\_THRESHOLD} = 0.30$), the system explicitly **abstains** from answering, surfacing a transparent legal disclaimer rather than guessing.
+1. **Abstention-Over-Hallucination Discipline**: If retrieved legal evidence falls below the calibrated confidence threshold (`MIN_CONFIDENCE_THRESHOLD = 0.30`), the system explicitly **abstains** from answering, surfacing a transparent legal disclaimer rather than guessing.
 2. **Dense Vector & Hybrid Retrieval**: Uses `SentenceTransformer("all-MiniLM-L6-v2")` to generate real 384-dimensional dense semantic vector embeddings combined with BM25 lexical search and Reciprocal Rank Fusion (RRF).
 3. **Verbatim & Paraphrase Grounding Verification**: Extracted obligations and rights undergo mandatory Jaccard token overlap substring validation to ensure every extracted claim is traceable directly to clause text.
 4. **Multidimensional False Premise Detection**: Detects and corrects contradictory assumptions in user queries across 8 legal dimensions (notice periods, liability caps, SLA availability %, payment net terms, governing state laws, audit frequencies, dispute resolution, confidentiality durations).
@@ -138,7 +139,7 @@ sequenceDiagram
 
 ### 🔍 2. Real Dense Vector Hybrid Search
 * Powered by `SentenceTransformer("all-MiniLM-L6-v2")` for dense 384-dimensional semantic embeddings.
-* Blends semantic vector cosine similarity ($75\%$) with BM25 keyword matching ($25\%$) using Reciprocal Rank Fusion (RRF).
+* Blends semantic vector cosine similarity (75%) with BM25 keyword matching (25%) using Reciprocal Rank Fusion (RRF).
 * Strict tenant-isolated metadata filtering prevents cross-tenant document exposure.
 
 ### 🛑 3. False Premise & Contradiction Inspection
@@ -220,7 +221,7 @@ LawPedia/
 │   │   ├── styles/tokens.css     # CSS custom properties & color tokens
 │   │   ├── App.tsx               # Main application component & API router
 │   │   └── main.tsx              # React DOM entry point
-├── tests/                        # Automated Pytest Suite (22 Tests, 77% Coverage)
+├── tests/                        # Automated Pytest Suite (29 Tests, 80% Coverage)
 │   ├── test_accessibility.py     # WCAG 2.2 color contrast & ARIA verification
 │   ├── test_chaos_resilience.py  # Abstention & low-confidence retrieval resilience
 │   ├── test_config.py            # Startup configuration & secret key guard assertions
@@ -229,6 +230,7 @@ LawPedia/
 │   ├── test_load_performance.py  # Concurrent multithreaded query load performance
 │   ├── test_module_imports.py    # Recursive backend module import integrity check
 │   ├── test_persistence.py       # SQLite database persistence across restarts
+│   ├── test_phase4_assistance.py # Citations, Jurisdiction, Plain-English Checklist & Contract Diff test
 │   ├── test_retrieval.py         # Dense vector semantic similarity verification
 │   ├── test_security_prompt_injection.py # PII redaction & prompt boundary security
 │   └── test_tenant_isolation.py # Fail-closed auth & cross-tenant IDOR attack simulation
@@ -316,12 +318,25 @@ The Web Interface will be available at: `http://localhost:3000`
 
 ---
 
+### 4. Cloud Deployment (Render.com)
+
+LawPedia includes built-in Render hostable files ([`render.yaml`](./render.yaml) & [`Procfile`](./Procfile)):
+
+```bash
+# 1-Click Render Deployment via Render Blueprint
+# Connect repo to Render Dashboard -> New + -> Blueprint -> render.yaml
+```
+
+For full setup instructions, see the [`docs/render_deployment.md`](./docs/render_deployment.md) guide.
+
+---
+
 ## 🧪 Automated Testing & Quality Assurance Suite
 
 LawPedia includes a comprehensive automated test suite covering unit, integration, performance, security, and accessibility checks.
 
 ### Running Full Test Suite
-To run all 22 tests with full terminal output:
+To run all 29 tests with full terminal output:
 
 ```bash
 python -m pytest tests/
@@ -385,7 +400,7 @@ No real API keys or production secrets are committed in source control. Reposito
 
 ## 📄 License
 
-Distributed under the **Apache License 2.0**. See [`LICENSE`](file:///c:/Users/Ramakrishna/OneDrive/Pictures/java/Documents/Projects/LawPedia/LICENSE) for more information.
+Distributed under the **Apache License 2.0**. See [`LICENSE`](./LICENSE) for more information.
 
 ---
 
@@ -394,7 +409,7 @@ Distributed under the **Apache License 2.0**. See [`LICENSE`](file:///c:/Users/R
 Contributions are welcome! Please review our STQA standards before submitting pull requests:
 
 1. All new code must be accompanied by unit/integration tests in `tests/`.
-2. All pull requests must maintain or increase the project's **77% test coverage** threshold.
+2. All pull requests must maintain or increase the project's **80% test coverage** threshold.
 3. Every claim of a bug fix must be backed by a reproducible before/after test.
 
 ---

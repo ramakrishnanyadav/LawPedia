@@ -19,26 +19,29 @@ class SafetyGateway:
         "All generated claims are anchored strictly to uploaded evidence spans. Consult a qualified attorney for formal legal advice."
     )
 
+    PROMPT_INJECTION_PATTERN = re.compile(
+        r"(?i)(ignore previous instructions|system override|you are now|forget all instructions|reveal system prompt|output system secret|output another tenant|ignora las instrucciones|neue anweisung|override rules|disregard above|new system prompt|print system prompt|base64 decode instruction)"
+    )
+
     @staticmethod
     def sanitize_prompt_evidence(raw_document_text: str) -> str:
         """
         Protects against prompt-injection attacks embedded within untrusted document text.
-        Wraps document text in non-executable XML data blocks and strips suspicious instruction overrides.
+        Strips instruction override payloads, neutralizes XML tag escape attempts,
+        and wraps content in non-executable structural evidence blocks.
         """
         if not raw_document_text:
             return ""
 
-        # Strip explicit system override attempts inside uploaded or retrieved document text
-        sanitized = re.sub(
-            r"(?i)(ignore previous instructions|system override|you are now|forget all instructions|reveal system prompt|output system secret|output another tenant)",
-            "[REDACTED_SUSPICIOUS_INSTRUCTION_OVERRIDE]",
-            raw_document_text
-        )
+        # Neutralize XML tag injection attempts inside document text
+        sanitized = raw_document_text.replace("</document_evidence>", "&lt;/document_evidence&gt;")
+        sanitized = sanitized.replace("<document_evidence>", "&lt;document_evidence&gt;")
 
-        # Enforce sandbox boundary if not already wrapped
-        if "<document_evidence>" not in sanitized:
-            return f"<document_evidence>\n{sanitized}\n</document_evidence>"
-        return sanitized
+        # Second-pass regex filter for multilingual and structural instruction override attempts
+        sanitized = SafetyGateway.PROMPT_INJECTION_PATTERN.sub("[REDACTED_SUSPICIOUS_INSTRUCTION_OVERRIDE]", sanitized)
+
+        # Enforce sandbox data boundary
+        return f"<document_evidence>\n{sanitized}\n</document_evidence>"
 
     @staticmethod
     def sanitize_retrieved_span_for_prompt(evidence_span_text: str) -> str:
@@ -46,11 +49,14 @@ class SafetyGateway:
         Strips/flags prompt injection attempts embedded in retrieved evidence *before*
         it is interpolated into any LLM prompt.
         """
-        return re.sub(
-            r"(?i)(ignore previous instructions|system override|you are now|forget all instructions|reveal system prompt|output system secret)",
-            "[REDACTED_EMBEDDED_PROMPT_INJECTION]",
-            evidence_span_text
-        )
+        if not evidence_span_text:
+            return ""
+        
+        # Neutralize XML tag escaping
+        clean_text = evidence_span_text.replace("</document_evidence>", "&lt;/document_evidence&gt;")
+        clean_text = clean_text.replace("<document_evidence>", "&lt;document_evidence&gt;")
+
+        return SafetyGateway.PROMPT_INJECTION_PATTERN.sub("[REDACTED_EMBEDDED_PROMPT_INJECTION]", clean_text)
 
     @staticmethod
     def redact_pii(text: str) -> str:

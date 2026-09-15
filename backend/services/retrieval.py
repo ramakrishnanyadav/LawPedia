@@ -2,7 +2,6 @@
 Hybrid Retrieval Engine (Real Dense Semantic Vectors + BM25 Lexical + RRF Reranking)
 """
 
-import math
 import re
 from typing import Optional
 import numpy as np
@@ -153,6 +152,8 @@ class HybridRetrievalService:
 
         spans: list[EvidenceSpan] = []
         for score, clause, meta in scored_items[:top_k]:
+            sec_str = clause.section if (clause.section.startswith("Section") or clause.section == "General") else f"Section {clause.section}"
+            citation_str = f"{sec_str}, page {clause.page}"
             spans.append(
                 EvidenceSpan(
                     source_document_id=meta.document_id,
@@ -161,6 +162,7 @@ class HybridRetrievalService:
                     section=clause.section,
                     clause_id=clause.clause_id,
                     evidence_span=clause.text,
+                    citation=citation_str,
                     document_version=meta.document_version,
                     effective_date=meta.effective_date,
                     jurisdiction=meta.jurisdiction,

@@ -19,7 +19,7 @@ export const DEMO_USER: UserProfile = {
   displayName: "Senior Legal Counsel",
   tenantId: "tenant_lawpedia_demo",
   photoURL: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100&auto=format&fit=crop&q=80",
-  token: "lawpedia_demo_token_2026"
+  token: import.meta.env.VITE_LAWPEDIA_DEMO_TOKEN || "lawpedia_demo_token_2026"
 };
 
 

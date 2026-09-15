@@ -83,7 +83,7 @@ export interface ComparisonItem {
 
 export interface ComparisonResult {
   doc_a_id: string;
-  doc_b_id: str;
+  doc_b_id: string;
   doc_a_name: string;
   doc_b_name: string;
   summary: string;

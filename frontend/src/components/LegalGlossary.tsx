@@ -43,7 +43,7 @@ interface LegalGlossaryProps {
 
 export const LegalGlossary: React.FC<LegalGlossaryProps> = ({ term, displayText }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const normalizedKey = term.toLowerCase().strip ? term.toLowerCase().trim() : term.toLowerCase();
+  const normalizedKey = term.toLowerCase().trim();
   const entry = GLOSSARY_DICTIONARY[normalizedKey];
 
   if (!entry) {

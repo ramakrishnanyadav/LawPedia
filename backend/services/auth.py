@@ -58,8 +58,10 @@ async def verify_firebase_token(authorization: Optional[str] = Header(None)) -> 
 
     token = parts[1]
 
-    # Instant demo token path explicitly scoped to demo tenant
-    if token == "lawpedia_demo_token_2026":
+    from backend.config import settings
+
+    # Instant demo token path explicitly enabled via server-side configuration
+    if settings.LAWPEDIA_DEMO_MODE and settings.LAWPEDIA_DEMO_TOKEN and token == settings.LAWPEDIA_DEMO_TOKEN:
         return AuthenticatedUser(
             uid="usr_lawpedia_demo_99",
             email="counsel@enterprise.law",

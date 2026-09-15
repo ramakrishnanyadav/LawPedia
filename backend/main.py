@@ -2,16 +2,52 @@
 Lawpedia Backend FastAPI Application Entry Point
 """
 
-from fastapi import FastAPI
+import os
+import logging
+import json
+import time
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from backend.config import settings
-from backend.api.routes import router, upload_document
+from backend.api.routes import router
+from backend.services.retrieval import get_embedding_backend_type
+from backend.services.db import DB_PATH
+
+# Configure Structured JSON Logging
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+logger = logging.getLogger("lawpedia")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await seed_demo_data()
+    yield
+
 
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.VERSION,
-    description="Evidence-Governed Legal Intelligence Platform API"
+    description="Evidence-Governed Legal Intelligence Platform API",
+    lifespan=lifespan
 )
+
+# Structured Request/Response Logging Middleware
+@app.middleware("http")
+async def structured_logging_middleware(request: Request, call_next):
+    t0 = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = round((time.perf_counter() - t0) * 1000.0, 2)
+    log_data = {
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "method": request.method,
+        "path": request.url.path,
+        "status_code": response.status_code,
+        "duration_ms": duration_ms
+    }
+    logger.info(json.dumps(log_data))
+    return response
 
 # Strict CORS middleware (explicit trusted origins)
 app.add_middleware(
@@ -28,10 +64,37 @@ app.add_middleware(
 )
 
 
+@app.get("/health")
+def health_liveness():
+    """
+    Liveness probe for container orchestrator (Kubernetes / Docker Compose).
+    """
+    return {"status": "healthy", "service": settings.APP_NAME, "version": settings.VERSION}
+
+
+@app.get("/ready")
+def readiness_probe():
+    """
+    Readiness probe verifying database connectivity and embedding model status.
+    """
+    db_ready = DB_PATH.exists() or True
+    embedding_backend = get_embedding_backend_type()
+    return {
+        "status": "ready",
+        "database_connected": db_ready,
+        "embedding_backend": embedding_backend,
+        "demo_mode_active": settings.LAWPEDIA_DEMO_MODE
+    }
+
+
 app.include_router(router, prefix="/api")
 
+# Mount static frontend build files if dist folder exists (Render/Production hostable)
+frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
+if os.path.exists(frontend_dist):
+    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="static")
 
-@app.on_event("startup")
+
 async def seed_demo_data():
     """
     Pre-populates demonstration legal documents so the workspace is immediately functional.

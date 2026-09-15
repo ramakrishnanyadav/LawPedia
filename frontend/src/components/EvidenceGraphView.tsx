@@ -14,7 +14,7 @@ export const EvidenceGraphView: React.FC = () => {
   useEffect(() => {
     fetch('/api/graph', {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('lawpedia_token') || 'lawpedia_demo_token_2026'}`
+        'Authorization': `Bearer ${localStorage.getItem('lawpedia_token') || ''}`
       }
     })
       .then((res) => res.json())

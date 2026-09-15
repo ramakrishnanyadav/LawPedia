@@ -13,7 +13,7 @@ export const LawyerHandoffView: React.FC = () => {
   const fetchHandoff = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('lawpedia_token') || 'lawpedia_demo_token_2026';
+      const token = localStorage.getItem('lawpedia_token') || '';
       const res = await fetch('/api/handoff', {
         method: 'POST',
         headers: {
