@@ -3,6 +3,7 @@ Legal Extraction Engine: GenAI Grounded Obligations, Rights, Conditions, Penalti
 """
 
 import re
+from typing import Optional
 from backend.schemas.eglr import ClauseObject, Obligation, RiskLevel
 from backend.services.safety import SafetyGateway
 
