@@ -14,9 +14,17 @@ _MODEL_INSTANCE = None
 def get_sentence_model():
     global _MODEL_INSTANCE
     if _MODEL_INSTANCE is None:
-        # Memory-constrained hosts (e.g., Render 512MB free tier) can set LAWPEDIA_LIGHTWEIGHT_MODE=true
-        if os.getenv("LAWPEDIA_LIGHTWEIGHT_MODE", "false").lower() in ("true", "1", "t") or os.getenv("DISABLE_HEAVY_TRANSFORMERS", "false").lower() in ("true", "1", "t"):
-            print("Notice: Lightweight mode enabled via environment variable. Using 384-dim dense vectorizer.")
+        # Memory-constrained hosts (e.g., Render 512MB free tier)
+        is_render_host = bool(os.getenv("RENDER") or os.getenv("RENDER_SERVICE_ID") or os.getenv("RENDER_INSTANCE_ID"))
+        lightweight_flag = os.getenv("LAWPEDIA_LIGHTWEIGHT_MODE", "").lower()
+        is_lightweight = (
+            is_render_host
+            or lightweight_flag in ("true", "1", "t")
+            or os.getenv("DISABLE_HEAVY_TRANSFORMERS", "false").lower() in ("true", "1", "t")
+        )
+
+        if is_lightweight:
+            print("Notice: Lightweight mode active (Render environment detected / memory limit). Using 384-dim dense vectorizer.")
             _MODEL_INSTANCE = False
             return None
         try:
