@@ -22,6 +22,8 @@ services:
         value: lawpedia_demo_token_2026
       - key: LAWPEDIA_SECRET_KEY
         generateValue: true
+      - key: LAWPEDIA_LIGHTWEIGHT_MODE
+        value: "true"
       - key: MIN_CONFIDENCE_THRESHOLD
         value: "0.30"
       - key: PYTHON_VERSION

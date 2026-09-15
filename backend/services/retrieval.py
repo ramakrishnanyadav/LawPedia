@@ -6,17 +6,24 @@ import re
 from typing import Optional
 import numpy as np
 from backend.schemas.eglr import ClauseObject, DocumentMetadata, EvidenceSpan
+import os
+
 _MODEL_INSTANCE = None
 
 
 def get_sentence_model():
     global _MODEL_INSTANCE
     if _MODEL_INSTANCE is None:
+        # Memory-constrained hosts (e.g., Render 512MB free tier) can set LAWPEDIA_LIGHTWEIGHT_MODE=true
+        if os.getenv("LAWPEDIA_LIGHTWEIGHT_MODE", "false").lower() in ("true", "1", "t") or os.getenv("DISABLE_HEAVY_TRANSFORMERS", "false").lower() in ("true", "1", "t"):
+            print("Notice: Lightweight mode enabled via environment variable. Using 384-dim dense vectorizer.")
+            _MODEL_INSTANCE = False
+            return None
         try:
             from sentence_transformers import SentenceTransformer
             _MODEL_INSTANCE = SentenceTransformer("all-MiniLM-L6-v2")
-        except Exception as e:
-            print("Notice: SentenceTransformer fallback mode:", e)
+        except (Exception, MemoryError) as e:
+            print("Notice: SentenceTransformer unavailable or memory limit reached, falling back to 384-dim dense vectorizer:", e)
             _MODEL_INSTANCE = False
     return _MODEL_INSTANCE if _MODEL_INSTANCE is not False else None
 

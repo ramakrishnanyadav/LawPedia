@@ -49,6 +49,7 @@ Render supports hosting directly from the repository's [`Dockerfile`](../Dockerf
 | `LAWPEDIA_DEMO_MODE` | No | `true` | Enables demonstration token access mode |
 | `LAWPEDIA_DEMO_TOKEN` | No | `lawpedia_demo_token_2026` | Auth token for demo evaluation |
 | `LAWPEDIA_SECRET_KEY` | Yes | `<random 32-char string>` | Secret key for cryptographic operations |
+| `LAWPEDIA_LIGHTWEIGHT_MODE` | No | `true` | Prevents 512MB RAM OOM on Render Free Tier by using 384-dim TF-IDF vectorizer |
 | `OPENAI_API_KEY` | No | `sk-...` | Optional key for OpenAI LLM simplification |
 | `ANTHROPIC_API_KEY` | No | `sk-ant-...` | Optional key for Anthropic Claude simplification |
 
