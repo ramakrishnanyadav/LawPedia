@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Lawpedia Pristine Archival White Design Tokens */
+:root {
+  /* Core Surface & Ink Palette */
+  --ink: #0f172a;               /* Slate-900: Primary high-contrast text */
+  --ink-muted: #475569;         /* Slate-600: Secondary text */
+  --ink-light: #64748b;         /* Slate-500: Subtitle & caption text */
+  
+  --paper: #ffffff;             /* Pure White: Main workspace surface */
+  --paper-subtle: #f8fafc;      /* Slate-50: Secondary card background */
+  --paper-elevated: #ffffff;    /* Raised card background */
+  
+  --border-subtle: #e2e8f0;     /* Slate-200: Hairline divider border */
+  --border-strong: #cbd5e1;     /* Slate-300: Strong card border */
+  
+  /* Primary Interaction Accent (Royal Archival Blue) */
+  --evidence-accent: #1d4ed8;   /* Blue-700 */
+  --evidence-accent-hover: #1e40af; /* Blue-800 */
+  --evidence-accent-light: #eff6ff; /* Blue-50 */
+  
+  /* Semantic Support Status Colors */
+  --status-supported-bg: #f0fdf4;
+  --status-supported-text: #15803d;
+  --status-supported-border: #bbf7d0;
+  
+  --status-partially-bg: #fffbeb;
+  --status-partially-text: #b45309;
+  --status-partially-border: #fde68a;
+  
+  --status-contradicted-bg: #fef2f2;
+  --status-contradicted-text: #b91c1c;
+  --status-contradicted-border: #fecaca;
+  
+  --status-insufficient-bg: #f8fafc;
+  --status-insufficient-text: #475569;
+  --status-insufficient-border: #e2e8f0;
+
+  /* Glassmorphism Light Mode */
+  --glass-bg: rgba(255, 255, 255, 0.92);
+  --glass-border: rgba(226, 232, 240, 0.85);
+  --glass-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.06), 0 4px 6px -2px rgba(15, 23, 42, 0.03);
+}
+
+body {
+  margin: 0;
+  background-color: var(--paper-subtle);
+  color: var(--ink);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Accessible Focus Ring States */
+*:focus-visible {
+  outline: 3px solid var(--evidence-accent) !important;
+  outline-offset: 2px !important;
+}
+
+/* Glass Surface Utility */
+.glass-panel-light {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  box-shadow: var(--glass-shadow);
+}
+
+.glass-nav-light {
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Custom Scrollbars Light Theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Status Badges */
+.badge-supported {
+  background-color: var(--status-supported-bg);
+  color: var(--status-supported-text);
+  border: 1px solid var(--status-supported-border);
+}
+
+.badge-partially {
+  background-color: var(--status-partially-bg);
+  color: var(--status-partially-text);
+  border: 1px solid var(--status-partially-border);
+}
+
+.badge-contradicted {
+  background-color: var(--status-contradicted-bg);
+  color: var(--status-contradicted-text);
+  border: 1px solid var(--status-contradicted-border);
+}
+
+.badge-insufficient {
+  background-color: var(--status-insufficient-bg);
+  color: var(--status-insufficient-text);
+  border: 1px solid var(--status-insufficient-border);
+}
