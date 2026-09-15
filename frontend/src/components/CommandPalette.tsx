@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Search, FileText, Cpu, GitCompare, Network, Share2, Shield, X, ArrowRight, CornerDownLeft } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Search, FileText, Cpu, GitCompare, Network, Share2, X, CornerDownLeft } from 'lucide-react';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -15,13 +15,19 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   onSelectQuery
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        if (isOpen) onClose();
-        else onClose(); // parent toggle
+        onClose();
       }
       if (e.key === 'Escape' && isOpen) {
         onClose();
@@ -56,12 +62,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         <div className="relative border-b border-slate-100 px-4 py-3.5 flex items-center gap-3">
           <Search className="w-5 h-5 text-slate-400" />
           <input
+            ref={inputRef}
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Type a command, search clauses, or jump to route... (Esc to close)"
             className="w-full bg-transparent text-sm text-slate-900 placeholder-slate-400 focus:outline-none font-sans"
-            autoFocus
           />
           <button
             onClick={onClose}

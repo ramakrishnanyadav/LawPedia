@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { UserProfile, DEMO_USER, auth, googleProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup } from '../config/firebase';
-import { LogIn, UserPlus, Lock, Mail, ShieldCheck, X, Sparkles, AlertCircle } from 'lucide-react';
+import { Lock, Mail, ShieldCheck, X, Sparkles, AlertCircle } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -47,7 +47,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
       onClose();
     } catch (err: any) {
       console.error("Firebase Authentication Error:", err);
-      // Fail closed: surface error message to user and stop
       setError(err.message || 'Firebase authentication failed. Please check credentials.');
     } finally {
       setLoading(false);
@@ -84,6 +83,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
     onLoginSuccess(DEMO_USER);
     onClose();
   };
+
+  let submitButtonText = 'Log In to Firebase Workspace';
+  if (loading) {
+    submitButtonText = 'Authenticating with Firebase SDK...';
+  } else if (mode === 'register') {
+    submitButtonText = 'Register Account';
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
@@ -133,8 +139,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           {mode === 'register' && (
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">Full Name / Counsel Title</label>
+              <label htmlFor="auth-display-name" className="font-semibold text-slate-700 block mb-1">Full Name / Counsel Title</label>
               <input
+                id="auth-display-name"
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
@@ -146,10 +153,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
           )}
 
           <div>
-            <label className="font-semibold text-slate-700 block mb-1">Email Address</label>
+            <label htmlFor="auth-email" className="font-semibold text-slate-700 block mb-1">Email Address</label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
               <input
+                id="auth-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -161,10 +169,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
           </div>
 
           <div>
-            <label className="font-semibold text-slate-700 block mb-1">Password</label>
+            <label htmlFor="auth-password" className="font-semibold text-slate-700 block mb-1">Password</label>
             <div className="relative">
               <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
               <input
+                id="auth-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -180,7 +189,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
             disabled={loading}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-bold transition-all shadow-md shadow-blue-600/20 disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {loading ? 'Authenticating with Firebase SDK...' : mode === 'login' ? 'Log In to Firebase Workspace' : 'Register Account'}
+            {submitButtonText}
           </button>
         </form>
 

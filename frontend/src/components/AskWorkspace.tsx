@@ -158,10 +158,18 @@ export const AskWorkspace: React.FC<AskWorkspaceProps> = ({ onRunQuery }) => {
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Claim-Level Verification Matrix
               </h3>
               <div className="space-y-3">
-                {response.claims.map((c, idx) => (
+                {response.claims.map((c) => (
                   <div
-                    key={idx}
+                    key={c.claim_id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => c.evidence && setSelectedSpan(c.evidence)}
+                    onKeyDown={(e) => {
+                      if ((e.key === 'Enter' || e.key === ' ') && c.evidence) {
+                        e.preventDefault();
+                        setSelectedSpan(c.evidence);
+                      }
+                    }}
                     className={`p-4 rounded-xl border transition-all cursor-pointer ${
                       selectedSpan?.clause_id === c.evidence?.clause_id
                         ? 'bg-blue-50/80 border-blue-500 shadow-sm'
@@ -187,8 +195,8 @@ export const AskWorkspace: React.FC<AskWorkspaceProps> = ({ onRunQuery }) => {
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Practical Next Steps</h3>
               <ul className="space-y-2">
-                {response.practical_next_steps.map((step, idx) => (
-                  <li key={idx} className="text-xs text-slate-700 flex items-start gap-2 font-medium">
+                {response.practical_next_steps.map((step) => (
+                  <li key={step} className="text-xs text-slate-700 flex items-start gap-2 font-medium">
                     <ChevronRight className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                     <span>{step}</span>
                   </li>

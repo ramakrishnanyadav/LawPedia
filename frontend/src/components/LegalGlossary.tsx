@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { HelpCircle, Info } from 'lucide-react';
+import { HelpCircle } from 'lucide-react';
 
 const GLOSSARY_DICTIONARY: Record<string, { plainTerm: string; definition: string }> = {
   indemnify: {

@@ -61,12 +61,12 @@ def health_check():
     }
 
 
-@router.post("/upload", response_model=DocumentUploadResponse)
+@router.post("/upload", response_model=DocumentUploadResponse, responses={400: {"description": "Bad Request"}, 500: {"description": "Internal Server Error"}})
 async def upload_document(
     file: Optional[UploadFile] = File(None),
     filename: Optional[str] = Form(None),
     text_content: Optional[str] = Form(None),
-    document_version: str = Form("v1.0"),
+    document_version: Optional[str] = Form("v1.0"),
     user: AuthenticatedUser = Depends(verify_firebase_token)
 ):
     """
@@ -246,7 +246,7 @@ def ask_question(
     )
 
 
-@router.post("/compare", response_model=ComparisonResult)
+@router.post("/compare", response_model=ComparisonResult, responses={403: {"description": "Access Denied"}, 404: {"description": "Document Not Found"}})
 def compare_documents(
     doc_a_id: str,
     doc_b_id: str,

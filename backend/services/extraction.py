@@ -36,6 +36,38 @@ class LegalExtractionService:
         return overlap >= 0.65
 
     @classmethod
+    def _parse_sentence_obligation(cls, sent_clean: str, clause: ClauseObject) -> Optional[Obligation]:
+        if not re.search(r"\b(shall|must|agrees to|is required to|covenants|undertakes to|shall maintain|shall keep)\b", sent_clean, re.IGNORECASE):
+            return None
+
+        party = "Party A"
+        for p in clause.entities:
+            if p.lower() in sent_clean.lower():
+                party = p
+                break
+
+        cond_match = re.search(r"\b(if|provided that|subject to|in the event of)\s+([^,.;]+)", sent_clean, re.IGNORECASE)
+        cond_text = cond_match.group(0).strip() if cond_match else None
+
+        deadline_match = re.search(r"\bwithin \d+ (?:days?|months?|years?)\b|\bprior to [^,.;]+|\bno later than [^,.;]+", sent_clean, re.IGNORECASE)
+        deadline = deadline_match.group(0).strip() if deadline_match else None
+
+        penalty_match = re.search(r"\b(?:penalty|cure period|late fee|liquidated damages) of [^,.;]+|\binterest at \d+%", sent_clean, re.IGNORECASE)
+        penalty = penalty_match.group(0).strip() if penalty_match else None
+
+        risk = RiskLevel.HIGH if any(kw in sent_clean.lower() for kw in ("sole discretion", "immediate termination", "unlimited liability")) else RiskLevel.MEDIUM
+
+        return Obligation(
+            party=party,
+            obligation_text=sent_clean,
+            clause_id=clause.clause_id,
+            conditional_on=cond_text,
+            deadline=deadline,
+            penalty=penalty,
+            risk_level=risk
+        )
+
+    @classmethod
     def extract_obligations(cls, clause: ClauseObject) -> list[Obligation]:
         """
         Extracts structured obligations, strictly anchored to exact text present within the clause.
@@ -43,49 +75,15 @@ class LegalExtractionService:
         """
         obligations: list[Obligation] = []
         sanitized_text = SafetyGateway.sanitize_retrieved_span_for_prompt(clause.text)
-
-        # Sentence-level grounded parsing
         sentences = re.split(r"(?<=[.!?])\s+", sanitized_text)
+
         for sent in sentences:
             sent_clean = sent.strip()
-            if not sent_clean:
+            if not sent_clean or not cls._is_grounded_in_clause(sent_clean, clause.text):
                 continue
-
-            # Grounding validation check
-            if not cls._is_grounded_in_clause(sent_clean, clause.text):
-                continue
-
-            if re.search(r"\b(shall|must|agrees to|is required to|covenants|undertakes to|shall maintain|shall keep)\b", sent_clean, re.IGNORECASE):
-                party = "Party A"
-                for p in clause.entities:
-                    if p.lower() in sent_clean.lower():
-                        party = p
-                        break
-                
-                cond_match = re.search(r"\b(if|provided that|subject to|in the event of)\s+([^,.;]+)", sent_clean, re.IGNORECASE)
-                cond_text = cond_match.group(0).strip() if cond_match else None
-
-                deadline_match = re.search(r"\b(within \d+ (?:days?|months?|years?)|prior to [^,.;]+|no later than [^,.;]+)", sent_clean, re.IGNORECASE)
-                deadline = deadline_match.group(0).strip() if deadline_match else None
-
-                penalty_match = re.search(r"\b(penalty of [^,.;]+|cure period of [^,.;]+|late fee of [^,.;]+|interest at \d+%|liquidated damages of [^,.;]+)", sent_clean, re.IGNORECASE)
-                penalty = penalty_match.group(0).strip() if penalty_match else None
-
-                risk = RiskLevel.MEDIUM
-                if "sole discretion" in sent_clean.lower() or "immediate termination" in sent_clean.lower() or "unlimited liability" in sent_clean.lower():
-                    risk = RiskLevel.HIGH
-
-                obligations.append(
-                    Obligation(
-                        party=party,
-                        obligation_text=sent_clean,
-                        clause_id=clause.clause_id,
-                        conditional_on=cond_text,
-                        deadline=deadline,
-                        penalty=penalty,
-                        risk_level=risk
-                    )
-                )
+            ob = cls._parse_sentence_obligation(sent_clean, clause)
+            if ob:
+                obligations.append(ob)
 
         return obligations
 

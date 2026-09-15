@@ -52,6 +52,54 @@ class LegalSimplificationService:
             _CIRCUIT_BREAKER_UNTIL = time.time() + 60.0  # Open circuit breaker for 60 seconds
 
     @staticmethod
+    def _try_openai_simplification(clean_text: str, reading_level: str) -> Optional[str]:
+        openai_key = os.getenv("OPENAI_API_KEY")
+        if not openai_key:
+            return None
+        try:
+            import openai
+            client = openai.OpenAI(api_key=openai_key)
+            response = client.chat.completions.create(
+                model=settings.OPENAI_MODEL_NAME,
+                messages=[
+                    {"role": "system", "content": f"You are a legal assistant. Simplify the provided clause at a {reading_level} reading level strictly using facts from the evidence provided."},
+                    {"role": "user", "content": clean_text}
+                ],
+                max_tokens=250,
+                temperature=0.1
+            )
+            if response.choices and response.choices[0].message.content:
+                LegalSimplificationService._record_llm_success()
+                return f"PLAIN SUMMARY ({reading_level.upper()} LEVEL) [MODE: LLM_OPENAI]: {response.choices[0].message.content.strip()}"
+        except Exception as err:
+            LegalSimplificationService._record_llm_failure()
+            print("Notice: OpenAI API simplification fallback:", err)
+        return None
+
+    @staticmethod
+    def _try_anthropic_simplification(clean_text: str, reading_level: str) -> Optional[str]:
+        anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+        if not anthropic_key:
+            return None
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=anthropic_key)
+            response = client.messages.create(
+                model=settings.ANTHROPIC_MODEL_NAME,
+                max_tokens=250,
+                temperature=0.1,
+                system=f"You are a legal assistant. Simplify the provided clause at a {reading_level} reading level strictly using facts from the evidence provided.",
+                messages=[{"role": "user", "content": clean_text}]
+            )
+            if response.content and len(response.content) > 0:
+                LegalSimplificationService._record_llm_success()
+                return f"PLAIN SUMMARY ({reading_level.upper()} LEVEL) [MODE: LLM_ANTHROPIC]: {response.content[0].text.strip()}"
+        except Exception as err:
+            LegalSimplificationService._record_llm_failure()
+            print("Notice: Anthropic API simplification fallback:", err)
+        return None
+
+    @staticmethod
     def simplify_clause(clause_text: str, reading_level: str = "simple", tenant_id: str = "tenant_default", section_title: str = "") -> str:
         """
         Simplifies legal clause text into plain language using LLM API (OpenAI/Anthropic) when available,
@@ -61,49 +109,14 @@ class LegalSimplificationService:
         sanitized = SafetyGateway.sanitize_prompt_evidence(clause_text)
         clean_text = re.sub(r"</?document_evidence>", "", sanitized).strip()
 
-        # Check rate limiting and circuit breaker before making external API calls
         if not LegalSimplificationService._is_rate_limited(tenant_id) and not LegalSimplificationService._is_circuit_breaker_open():
-            # 1. Attempt OpenAI API completion if configured
-            openai_key = os.getenv("OPENAI_API_KEY")
-            if openai_key:
-                try:
-                    import openai
-                    client = openai.OpenAI(api_key=openai_key)
-                    response = client.chat.completions.create(
-                        model=settings.OPENAI_MODEL_NAME,
-                        messages=[
-                            {"role": "system", "content": f"You are a legal assistant. Simplify the provided clause at a {reading_level} reading level strictly using facts from the evidence provided."},
-                            {"role": "user", "content": clean_text}
-                        ],
-                        max_tokens=250,
-                        temperature=0.1
-                    )
-                    if response.choices and response.choices[0].message.content:
-                        LegalSimplificationService._record_llm_success()
-                        return f"PLAIN SUMMARY ({reading_level.upper()} LEVEL) [MODE: LLM_OPENAI]: {response.choices[0].message.content.strip()}"
-                except Exception as err:
-                    LegalSimplificationService._record_llm_failure()
-                    print("Notice: OpenAI API simplification fallback:", err)
+            res_oa = LegalSimplificationService._try_openai_simplification(clean_text, reading_level)
+            if res_oa:
+                return res_oa
 
-            # 2. Attempt Anthropic API completion if configured
-            anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-            if anthropic_key:
-                try:
-                    import anthropic
-                    client = anthropic.Anthropic(api_key=anthropic_key)
-                    response = client.messages.create(
-                        model=settings.ANTHROPIC_MODEL_NAME,
-                        max_tokens=250,
-                        temperature=0.1,
-                        system=f"You are a legal assistant. Simplify the provided clause at a {reading_level} reading level strictly using facts from the evidence provided.",
-                        messages=[{"role": "user", "content": clean_text}]
-                    )
-                    if response.content and len(response.content) > 0:
-                        LegalSimplificationService._record_llm_success()
-                        return f"PLAIN SUMMARY ({reading_level.upper()} LEVEL) [MODE: LLM_ANTHROPIC]: {response.content[0].text.strip()}"
-                except Exception as err:
-                    LegalSimplificationService._record_llm_failure()
-                    print("Notice: Anthropic API simplification fallback:", err)
+            res_ant = LegalSimplificationService._try_anthropic_simplification(clean_text, reading_level)
+            if res_ant:
+                return res_ant
 
         # 3. Enhanced Clause-Aware Rule-Based Fallback (fallback_no_llm_configured)
         simplified = clean_text
@@ -121,7 +134,6 @@ class LegalSimplificationService:
         for pattern, rep in replacements.items():
             simplified = re.sub(pattern, rep, simplified, flags=re.IGNORECASE)
 
-        # Apply clause-type specific explanation template if section title is known
         clause_prefix = ""
         st_lower = section_title.lower()
         if "termination" in st_lower or "cancel" in st_lower:

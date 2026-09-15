@@ -35,7 +35,7 @@ def set_user_tenant_claim(uid: str, tenant_id: str):
             print("Notice: set_custom_user_claims failed:", e)
 
 
-async def verify_firebase_token(authorization: Optional[str] = Header(None)) -> AuthenticatedUser:
+def verify_firebase_token(authorization: Optional[str] = Header(None)) -> AuthenticatedUser:
     """
     FastAPI dependency enforcing strict server-side Firebase ID token verification.
     Rejects requests without valid tokens with 401 Unauthorized (fails closed).

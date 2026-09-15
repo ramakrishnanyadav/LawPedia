@@ -64,19 +64,15 @@ This agreement is governed by California law. Force majeure includes Acts of God
 
     start_time = time.time()
     relevant_hits = 0
-    total_retrieved = 0
     cdr_hits = 0
     total_false_premise_queries = 0
 
     for item in GOLDEN_BENCHMARK_SUITE:
         spans = retrieval.search(item["query"], "tenant_eval", top_k=3)
-        total_retrieved += len(spans)
-        
-        hit_found = False
+
         for s in spans:
             if item["expected_keyword"].lower() in s.evidence_span.lower():
                 relevant_hits += 1
-                hit_found = True
                 break
                 
         if item["has_false_premise"]:

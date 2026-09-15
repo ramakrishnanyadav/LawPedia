@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { DocumentMetadata } from '../types';
-import { Upload, FileText, Calendar, Shield, Trash2, Plus, Eye } from 'lucide-react';
+import { Upload, FileText, Plus, Eye } from 'lucide-react';
 
 interface DocumentLibraryProps {
   documents: DocumentMetadata[];
@@ -62,8 +62,9 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onU
             <form onSubmit={handleUploadSubmit} className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-slate-600 font-semibold block mb-1">Document Name / File</label>
+                  <label htmlFor="doc-filename" className="text-slate-600 font-semibold block mb-1">Document Name / File</label>
                   <input
+                    id="doc-filename"
                     type="text"
                     value={filename}
                     onChange={(e) => setFilename(e.target.value)}
@@ -73,8 +74,9 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onU
                   />
                 </div>
                 <div>
-                  <label className="text-slate-600 font-semibold block mb-1">Version String</label>
+                  <label htmlFor="doc-version" className="text-slate-600 font-semibold block mb-1">Version String</label>
                   <input
+                    id="doc-version"
                     type="text"
                     value={version}
                     onChange={(e) => setVersion(e.target.value)}
@@ -85,8 +87,9 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onU
               </div>
 
               <div>
-                <label className="text-slate-600 font-semibold block mb-1">Document Text Content</label>
+                <label htmlFor="doc-text" className="text-slate-600 font-semibold block mb-1">Document Text Content</label>
                 <textarea
+                  id="doc-text"
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   placeholder="Paste legal contract text, clauses, or agreement provisions here..."

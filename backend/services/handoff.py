@@ -25,7 +25,7 @@ class LawyerHandoffService:
         now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
         # Collect unique parties across documents
-        all_parties = list(set([p for d in documents for p in d.parties]))
+        all_parties = list({p for d in documents for p in d.parties})
         if not all_parties:
             all_parties = ["Party A", "Party B"]
 

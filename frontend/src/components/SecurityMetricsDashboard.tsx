@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Server, Cpu, CheckCircle2, AlertOctagon, Activity, FileCheck, Lock, Gauge } from 'lucide-react';
+import { ShieldCheck, Cpu, CheckCircle2, Activity, FileCheck, Lock } from 'lucide-react';
 
 export const SecurityMetricsDashboard: React.FC = () => {
-  const [securityData, setSecurityData] = useState<any>(null);
   const [sloData, setSloData] = useState<any>(null);
   const [goldenData, setGoldenData] = useState<any>(null);
 
   useEffect(() => {
-    fetch('/api/metrics/security').then((res) => res.json()).then((data) => setSecurityData(data)).catch(console.error);
     fetch('/api/metrics/slo').then((res) => res.json()).then((data) => setSloData(data)).catch(console.error);
     fetch('/api/metrics/golden').then((res) => res.json()).then((data) => setGoldenData(data)).catch(console.error);
   }, []);

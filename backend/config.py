@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, model_validator
 def _get_secret_key() -> str:
     secret_env = os.getenv("LAWPEDIA_SECRET_KEY")
     if not secret_env:
-        if not os.getenv("DEBUG", "True").lower() in ("true", "1", "t") or os.getenv("ENV", "development").lower() == "production":
+        if os.getenv("DEBUG", "True").lower() not in ("true", "1", "t") or os.getenv("ENV", "development").lower() == "production":
             raise RuntimeError(
                 "CRITICAL SECURITY CONFIGURATION ERROR: LAWPEDIA_SECRET_KEY environment variable is not set. "
                 "Set LAWPEDIA_SECRET_KEY in environment before starting production server."

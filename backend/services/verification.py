@@ -58,6 +58,29 @@ class ClaimVerificationEngine:
         return verifications
 
     @staticmethod
+    def _compute_span_score(claim_lower: str, claim_raw: str, span: EvidenceSpan, model: any) -> tuple[float, Optional[str]]:
+        sanitized_evidence = SafetyGateway.sanitize_retrieved_span_for_prompt(span.evidence_span)
+        ev_lower = sanitized_evidence.lower()
+        
+        c_days = re.search(r"\b(\d+)\s*days\b", claim_lower)
+        e_days = re.search(r"\b(\d+)\s*days\b", ev_lower)
+        if c_days and e_days and c_days.group(1) != e_days.group(1):
+            contradiction_note = f"Contradiction detected: Claim asserts {c_days.group(1)} days, whereas {span.document_name} specifies {e_days.group(1)} days."
+            return -1.0, contradiction_note
+
+        if model is not None:
+            try:
+                v_claim = model.encode(claim_raw, convert_to_numpy=True)
+                v_ev = model.encode(sanitized_evidence, convert_to_numpy=True)
+                score = float(np.dot(v_claim, v_ev) / (np.linalg.norm(v_claim) * np.linalg.norm(v_ev)))
+            except Exception:
+                score = ClaimVerificationEngine._heuristic_concept_overlap(claim_lower, ev_lower)
+        else:
+            score = ClaimVerificationEngine._heuristic_concept_overlap(claim_lower, ev_lower)
+
+        return score, None
+
+    @staticmethod
     def _evaluate_semantic_entailment(claim: str, evidence_spans: list[EvidenceSpan]) -> tuple[SupportStatus, Optional[EvidenceSpan], str]:
         """
         Evaluates semantic entailment (SUPPORTED, PARTIALLY_SUPPORTED, CONTRADICTED, INSUFFICIENT_EVIDENCE).
@@ -70,30 +93,9 @@ class ClaimVerificationEngine:
         best_score = 0.0
 
         for span in evidence_spans:
-            # Enforce pre-interpolation prompt sanitization
-            sanitized_evidence = SafetyGateway.sanitize_retrieved_span_for_prompt(span.evidence_span)
-            ev_lower = sanitized_evidence.lower()
-            
-            # Check for direct contradiction (numeric or clause conditions)
-            c_days = re.search(r"\b(\d+)\s*days\b", claim_lower)
-            e_days = re.search(r"\b(\d+)\s*days\b", ev_lower)
-            if c_days and e_days and c_days.group(1) != e_days.group(1):
-                return (
-                    SupportStatus.CONTRADICTED,
-                    span,
-                    f"Contradiction detected: Claim asserts {c_days.group(1)} days, whereas {span.document_name} specifies {e_days.group(1)} days."
-                )
-
-            # Check dense vector entailment score if model is available
-            if model is not None:
-                try:
-                    v_claim = model.encode(claim, convert_to_numpy=True)
-                    v_ev = model.encode(sanitized_evidence, convert_to_numpy=True)
-                    score = float(np.dot(v_claim, v_ev) / (np.linalg.norm(v_claim) * np.linalg.norm(v_ev)))
-                except Exception:
-                    score = ClaimVerificationEngine._heuristic_concept_overlap(claim_lower, ev_lower)
-            else:
-                score = ClaimVerificationEngine._heuristic_concept_overlap(claim_lower, ev_lower)
+            score, contradiction_note = ClaimVerificationEngine._compute_span_score(claim_lower, claim, span, model)
+            if score < 0.0 and contradiction_note:
+                return SupportStatus.CONTRADICTED, span, contradiction_note
 
             if score > best_score:
                 best_score = score

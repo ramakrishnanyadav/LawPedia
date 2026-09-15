@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { DocumentMetadata, ComparisonResult } from '../types';
-import { GitCompare, ArrowRight, ShieldAlert, CheckCircle, AlertTriangle } from 'lucide-react';
+import { GitCompare, ArrowRight } from 'lucide-react';
 
 interface ContractComparisonProps {
   documents: DocumentMetadata[];
@@ -54,8 +54,9 @@ export const ContractComparison: React.FC<ContractComparisonProps> = ({ document
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <div>
-            <label className="text-xs font-semibold text-slate-600 block mb-1.5">Select Original Document (A)</label>
+            <label htmlFor="compare-doc-a" className="text-xs font-semibold text-slate-600 block mb-1.5">Select Original Document (A)</label>
             <select
+              id="compare-doc-a"
               value={docAId}
               onChange={(e) => setDocAId(e.target.value)}
               className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:border-blue-600 font-medium"
@@ -73,8 +74,9 @@ export const ContractComparison: React.FC<ContractComparisonProps> = ({ document
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-600 block mb-1.5">Select Amended Document (B)</label>
+            <label htmlFor="compare-doc-b" className="text-xs font-semibold text-slate-600 block mb-1.5">Select Amended Document (B)</label>
             <select
+              id="compare-doc-b"
               value={docBId}
               onChange={(e) => setDocBId(e.target.value)}
               className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:border-blue-600 font-medium"
@@ -105,8 +107,8 @@ export const ContractComparison: React.FC<ContractComparisonProps> = ({ document
           </div>
 
           <div className="space-y-4">
-            {result.items.map((item, idx) => (
-              <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+            {result.items.map((item) => (
+              <div key={item.dimension} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                     {item.dimension}

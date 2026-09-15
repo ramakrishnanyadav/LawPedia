@@ -4,13 +4,16 @@
 FROM node:18-alpine AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Python Backend Runtime
 FROM python:3.11-slim AS runner
 WORKDIR /app
+
+# Create non-root user
+RUN groupadd -g 1001 appuser && useradd -u 1001 -g appuser -m appuser
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -30,6 +33,10 @@ COPY .env.example ./.env
 
 # Copy built frontend assets from builder stage
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+
+# Set ownership
+RUN chown -R appuser:appuser /app
+USER appuser
 
 # Expose FastAPI application port
 EXPOSE 8000

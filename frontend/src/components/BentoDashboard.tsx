@@ -1,6 +1,6 @@
 import React from 'react';
 import { DocumentMetadata } from '../types';
-import { Cpu, AlertTriangle, CheckCircle2, ShieldAlert, Clock, Scale, FileText, ArrowRight } from 'lucide-react';
+import { Cpu, AlertTriangle, ShieldAlert, Clock, Scale, FileText, ArrowRight } from 'lucide-react';
 
 interface BentoDashboardProps {
   documents: DocumentMetadata[];
@@ -9,7 +9,6 @@ interface BentoDashboardProps {
 
 export const BentoDashboard: React.FC<BentoDashboardProps> = ({ documents, onNavigateToTab }) => {
   const primaryDoc = documents[0];
-  const secondaryDoc = documents[1];
 
   return (
     <div className="space-y-6">

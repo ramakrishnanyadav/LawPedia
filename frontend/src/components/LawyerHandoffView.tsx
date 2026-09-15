@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LawyerHandoffPack } from '../types';
-import { Share2, Download, Printer, ShieldCheck, CheckSquare, Calendar, HelpCircle, FileText, Scale } from 'lucide-react';
+import { Share2, Printer, Calendar, HelpCircle, FileText, Scale } from 'lucide-react';
 
 interface LawyerHandoffViewProps {
   getAuthToken?: () => string;
@@ -102,8 +102,8 @@ export const LawyerHandoffView: React.FC<LawyerHandoffViewProps> = ({ getAuthTok
             <div className="space-y-2">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">2. Identified Parties</h4>
               <ul className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-1.5 text-xs text-slate-800">
-                {pack.parties_involved.map((p, i) => (
-                  <li key={i} className="flex items-center gap-2 font-semibold">
+                {pack.parties_involved.map((p) => (
+                  <li key={p} className="flex items-center gap-2 font-semibold">
                     <span className="w-2 h-2 rounded-full bg-blue-600"></span> {p}
                   </li>
                 ))}
@@ -113,8 +113,8 @@ export const LawyerHandoffView: React.FC<LawyerHandoffViewProps> = ({ getAuthTok
             <div className="space-y-2">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">3. Relevant Documents</h4>
               <ul className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-1.5 text-xs text-slate-800">
-                {pack.relevant_documents.map((d, i) => (
-                  <li key={i} className="flex items-center gap-2 font-mono">
+                {pack.relevant_documents.map((d) => (
+                  <li key={d} className="flex items-center gap-2 font-mono">
                     <FileText className="w-3.5 h-3.5 text-blue-600" /> {d}
                   </li>
                 ))}
@@ -128,8 +128,8 @@ export const LawyerHandoffView: React.FC<LawyerHandoffViewProps> = ({ getAuthTok
               4. Key Clauses & Extracted Obligations
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {pack.key_clauses.map((c, i) => (
-                <div key={i} className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2 text-xs">
+              {pack.key_clauses.map((c) => (
+                <div key={c.clause_id} className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2 text-xs">
                   <div className="flex items-center justify-between font-mono text-slate-500">
                     <span>{c.section}</span>
                     <span className="text-blue-700 font-semibold">{c.clause_id}</span>
@@ -147,8 +147,8 @@ export const LawyerHandoffView: React.FC<LawyerHandoffViewProps> = ({ getAuthTok
               <Calendar className="w-4 h-4 text-amber-600" /> 6. Critical Dates & Deadlines
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {pack.important_dates.map((d, i) => (
-                <div key={i} className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1">
+              {pack.important_dates.map((d) => (
+                <div key={d.event} className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1">
                   <span className="text-slate-500 block font-mono">{d.event}</span>
                   <span className="font-mono text-amber-800 font-bold">{d.date}</span>
                 </div>
@@ -161,8 +161,8 @@ export const LawyerHandoffView: React.FC<LawyerHandoffViewProps> = ({ getAuthTok
             <div className="space-y-2">
               <h4 className="text-xs font-bold uppercase tracking-wider text-amber-800">7. Identified Conflicts / Risk Shifts</h4>
               <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 text-xs text-amber-950 space-y-2 font-medium">
-                {pack.potential_conflicts.map((c, i) => (
-                  <p key={i}>• {c}</p>
+                {pack.potential_conflicts.map((c) => (
+                  <p key={c}>• {c}</p>
                 ))}
               </div>
             </div>
@@ -170,8 +170,8 @@ export const LawyerHandoffView: React.FC<LawyerHandoffViewProps> = ({ getAuthTok
             <div className="space-y-2">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">8. Unanswered Questions</h4>
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-700 space-y-2">
-                {pack.unanswered_questions.map((u, i) => (
-                  <p key={i}>• {u}</p>
+                {pack.unanswered_questions.map((u) => (
+                  <p key={u}>• {u}</p>
                 ))}
               </div>
             </div>
@@ -184,7 +184,7 @@ export const LawyerHandoffView: React.FC<LawyerHandoffViewProps> = ({ getAuthTok
             </h4>
             <ul className="space-y-2 text-xs text-blue-950">
               {pack.questions_for_lawyer.map((q, i) => (
-                <li key={i} className="flex items-start gap-2 font-medium">
+                <li key={q} className="flex items-start gap-2 font-medium">
                   <span className="font-bold text-blue-700">{i + 1}.</span>
                   <span>{q}</span>
                 </li>

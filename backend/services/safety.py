@@ -70,11 +70,11 @@ class SafetyGateway:
         text = re.sub(r"\b\d{3}-\d{2}-\d{4}\b", "[REDACTED_SSN]", text)
         text = re.sub(r"\b\d{4}\s?\d{4}\s?\d{4}\b", "[REDACTED_AADHAAR]", text)
         # PAN-like uppercase alphanumeric
-        text = re.sub(r"\b[A-Z]{5}\d{4}[A-Z]{1}\b", "[REDACTED_PAN]", text)
+        text = re.sub(r"\b[A-Z]{5}\d{4}[A-Z]\b", "[REDACTED_PAN]", text)
         # Phone
         text = re.sub(r"\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b", "[REDACTED_PHONE]", text)
         # Credit Card
-        text = re.sub(r"\b(?:\d[ -]*?){13,16}\b", "[REDACTED_CC]", text)
+        text = re.sub(r"\b(?:\d[\s-]*){13,16}\b", "[REDACTED_CC]", text)
         return text
 
     @staticmethod

@@ -1,7 +1,7 @@
 /* Lawpedia Real Firebase Authentication & Analytics SDK Integration */
 
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut as firebaseSignOut } from "firebase/auth";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 export interface UserProfile {
   uid: string;
@@ -34,17 +34,9 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase safely
-let app: any = null;
-let auth: any = null;
-let googleProvider: any = null;
-
-try {
-  app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  googleProvider = new GoogleAuthProvider();
-} catch (e) {
-  console.warn("Firebase SDK initialization fallback:", e);
-}
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
 
 export { app, auth, googleProvider };
-export { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, firebaseSignOut };
+export { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, signOut as firebaseSignOut } from "firebase/auth";

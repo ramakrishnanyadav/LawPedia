@@ -27,6 +27,54 @@ class ComparisonService:
     ]
 
     @staticmethod
+    def _analyze_dimension(
+        dim_name: str,
+        c_a: Optional[ClauseObject],
+        c_b: Optional[ClauseObject],
+        meta_a: DocumentMetadata,
+        meta_b: DocumentMetadata
+    ) -> tuple[str, str, RiskLevel, Optional[str]]:
+        if c_a and not c_b:
+            status = "REMOVED"
+            analysis = f"Provision '{dim_name}' present in {meta_a.filename} was omitted in {meta_b.filename}."
+            risk = RiskLevel.MEDIUM
+            delta = f"[- {meta_a.filename}: {c_a.text} -]"
+            return status, analysis, risk, delta
+
+        if not c_a and c_b:
+            status = "ADDED"
+            analysis = f"New provision '{dim_name}' added in {meta_b.filename}."
+            risk = RiskLevel.LOW
+            delta = f"{{+ {meta_b.filename}: {c_b.text} +}}"
+            return status, analysis, risk, delta
+
+        text_a_clean = re.sub(r"\s+", " ", c_a.text.strip())
+        text_b_clean = re.sub(r"\s+", " ", c_b.text.strip())
+
+        if text_a_clean.lower() == text_b_clean.lower():
+            status = "UNCHANGED"
+            analysis = f"'{dim_name}' provisions are identical across both document versions."
+            risk = RiskLevel.LOW
+            delta = f"Identical text: '{c_a.text}'"
+            return status, analysis, risk, delta
+
+        status = "MODIFIED"
+        risk = RiskLevel.MEDIUM
+        if "unlimited" in text_b_clean.lower() and "limited" in text_a_clean.lower():
+            status = "CONFLICTING"
+            risk = RiskLevel.HIGH
+            analysis = f"CRITICAL RISK SHIFT: {dim_name} changed from limited liability to unlimited liability in {meta_b.filename}."
+        elif "sole discretion" in text_b_clean.lower() and "mutual" in text_a_clean.lower():
+            status = "MODIFIED"
+            risk = RiskLevel.HIGH
+            analysis = f"RISK SHIFT: Option changed from mutual consent to sole discretion in {meta_b.filename}."
+        else:
+            analysis = f"'{dim_name}' language modified between versions."
+
+        delta = f"[- {meta_a.filename}: {c_a.text} -]\n\n{{+ {meta_b.filename}: {c_b.text} +}}"
+        return status, analysis, risk, delta
+
+    @staticmethod
     def compare_documents(
         meta_a: DocumentMetadata,
         clauses_a: list[ClauseObject],
@@ -39,54 +87,13 @@ class ComparisonService:
         items: list[ComparisonItem] = []
 
         for dim_name, patterns in ComparisonService.DIMENSIONS:
-            # Find relevant clauses in Doc A
             c_a = ComparisonService._find_matching_clause(patterns, clauses_a)
             c_b = ComparisonService._find_matching_clause(patterns, clauses_b)
 
             if not c_a and not c_b:
                 continue
 
-            if c_a and not c_b:
-                status = "REMOVED"
-                analysis = f"Provision '{dim_name}' present in {meta_a.filename} was omitted in {meta_b.filename}."
-                risk = RiskLevel.MEDIUM
-            elif not c_a and c_b:
-                status = "ADDED"
-                analysis = f"New provision '{dim_name}' added in {meta_b.filename}."
-                risk = RiskLevel.LOW
-            else:
-                # Both exist - compare text
-                text_a_clean = re.sub(r"\s+", " ", c_a.text.strip())
-                text_b_clean = re.sub(r"\s+", " ", c_b.text.strip())
-
-                if text_a_clean.lower() == text_b_clean.lower():
-                    status = "UNCHANGED"
-                    analysis = f"'{dim_name}' provisions are identical across both document versions."
-                    risk = RiskLevel.LOW
-                else:
-                    # Check if risk shifted upwards
-                    status = "MODIFIED"
-                    risk = RiskLevel.MEDIUM
-                    if "unlimited" in text_b_clean.lower() and "limited" in text_a_clean.lower():
-                        status = "CONFLICTING"
-                        risk = RiskLevel.HIGH
-                        analysis = f"CRITICAL RISK SHIFT: {dim_name} changed from limited liability to unlimited liability in {meta_b.filename}."
-                    elif "sole discretion" in text_b_clean.lower() and "mutual" in text_a_clean.lower():
-                        status = "MODIFIED"
-                        risk = RiskLevel.HIGH
-                        analysis = f"RISK SHIFT: Option changed from mutual consent to sole discretion in {meta_b.filename}."
-                    else:
-                        analysis = f"'{dim_name}' language modified between versions."
-
-            delta = None
-            if status == "REMOVED" and c_a:
-                delta = f"[- {meta_a.filename}: {c_a.text} -]"
-            elif status == "ADDED" and c_b:
-                delta = f"{{+ {meta_b.filename}: {c_b.text} +}}"
-            elif status in ("MODIFIED", "CONFLICTING") and c_a and c_b:
-                delta = f"[- {meta_a.filename}: {c_a.text} -]\n\n{{+ {meta_b.filename}: {c_b.text} +}}"
-            elif status == "UNCHANGED" and c_a:
-                delta = f"Identical text: '{c_a.text}'"
+            status, analysis, risk, delta = ComparisonService._analyze_dimension(dim_name, c_a, c_b, meta_a, meta_b)
 
             items.append(
                 ComparisonItem(

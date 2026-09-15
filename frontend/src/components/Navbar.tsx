@@ -1,6 +1,6 @@
 import React from 'react';
 import { UserProfile } from '../config/firebase';
-import { Scale, FileText, Search, GitCompare, Calendar, Share2, Command, Sliders, ShieldAlert, LogIn, User } from 'lucide-react';
+import { Scale, FileText, Search, GitCompare, Calendar, Share2, Command, Sliders, LogIn, User } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: string;
@@ -47,10 +47,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
           <div>
             <h1 className="text-xl font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
-              Lawpedia
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-semibold">
-                EGLR v2.0
-              </span>
+              Lawpedia<span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-semibold">EGLR v2.0</span>
             </h1>
             <p className="text-xs text-slate-500 font-mono">Plain-Language Evidence Intelligence</p>
           </div>

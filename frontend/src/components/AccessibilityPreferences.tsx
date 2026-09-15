@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sliders, X, Check, Eye, Type, Sparkles, Volume2, Shield } from 'lucide-react';
+import { Sliders, X, Type, Sparkles } from 'lucide-react';
 
 export interface AccessibilitySettings {
   textScale: number; // 100 to 200

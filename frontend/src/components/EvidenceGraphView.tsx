@@ -1,8 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Network, Table, Info, ChevronDown, ChevronRight, Layers, Box } from 'lucide-react';
+import { Network, Table, Layers, Box } from 'lucide-react';
+
+interface GraphNode {
+  id: string;
+  type: string;
+  label: string;
+  text?: string;
+  filename?: string;
+  version?: string;
+  [key: string]: unknown;
+}
 
 interface GraphData {
-  nodes: { id: string; type: string; label: string; [key: string]: any }[];
+  nodes: GraphNode[];
   edges: { source: string; target: string; relationship: string }[];
 }
 
@@ -13,7 +23,7 @@ interface EvidenceGraphViewProps {
 export const EvidenceGraphView: React.FC<EvidenceGraphViewProps> = ({ getAuthToken }) => {
   const [graph, setGraph] = useState<GraphData | null>(null);
   const [viewMode, setViewMode] = useState<'visual' | 'table'>('visual');
-  const [selectedNode, setSelectedNode] = useState<any | null>(null);
+  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
 
   useEffect(() => {
     const token = (getAuthToken ? getAuthToken() : '') || localStorage.getItem('lawpedia_token') || '';
@@ -92,7 +102,15 @@ export const EvidenceGraphView: React.FC<EvidenceGraphViewProps> = ({ getAuthTok
               {graph.nodes.slice(0, 9).map((node) => (
                 <div
                   key={node.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setSelectedNode(node)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedNode(node);
+                    }
+                  }}
                   className={`p-4 rounded-xl border transition-all cursor-pointer space-y-1.5 ${
                     selectedNode?.id === node.id
                       ? 'bg-blue-50 border-blue-500 shadow-md'

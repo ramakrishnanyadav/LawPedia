@@ -31,6 +31,23 @@ class IngestionService:
         return True
 
     @staticmethod
+    def _extract_header_info(content_text: str, filename: str) -> tuple[str, list[str], str, str]:
+        title_match = re.search(r"^(?:CONTRACT|AGREEMENT|POLICY|MASTER SERVICES AGREEMENT|LEASE AGREEMENT|NON-DISCLOSURE AGREEMENT)[:\s]+([^\n]+)", content_text, re.IGNORECASE)
+        doc_title = title_match.group(1).strip() if title_match else filename.replace(".pdf", "").replace(".txt", "").replace("_", " ").title()
+
+        parties = list({p for p in re.findall(r"\b(?:Party A|Party B|Company|Client|Vendor|Contractor|Employer|Employee|Licensor|Licensee|Landlord|Tenant|Disclosing Party|Receiving Party)\b", content_text, re.IGNORECASE)})
+        if not parties:
+            parties = ["Party A", "Party B"]
+
+        jurisdiction_match = re.search(r"governed by the laws of (?:the State of |the Republic of )?([A-Za-z\s]+)", content_text, re.IGNORECASE)
+        jurisdiction = jurisdiction_match.group(1).strip() if jurisdiction_match else "General"
+
+        effective_date_match = re.search(r"effective as of ([A-Za-z0-9,\s]+|\d{4}-\d{2}-\d{2})", content_text, re.IGNORECASE)
+        effective_date = effective_date_match.group(1).strip() if effective_date_match else "2026-01-01"
+
+        return doc_title, parties, jurisdiction, effective_date
+
+    @staticmethod
     def parse_document(
         filename: str,
         content_text: str,
@@ -44,23 +61,8 @@ class IngestionService:
         doc_id = f"DOC_{uuid.uuid4().hex[:8].upper()}"
         now_str = datetime.now(timezone.utc).isoformat()
 
-        # Extract title and parties from text headers
-        title_match = re.search(r"^(?:CONTRACT|AGREEMENT|POLICY|MASTER SERVICES AGREEMENT|LEASE AGREEMENT|NON-DISCLOSURE AGREEMENT)[:\s\n]+([^\n]+)", content_text, re.IGNORECASE)
-        doc_title = title_match.group(1).strip() if title_match else filename.replace(".pdf", "").replace(".txt", "").replace("_", " ").title()
+        doc_title, parties, jurisdiction, effective_date = IngestionService._extract_header_info(content_text, filename)
 
-        parties = list(set(re.findall(r"\b(?:Party A|Party B|Company|Client|Vendor|Contractor|Employer|Employee|Licensor|Licensee|Landlord|Tenant|Disclosing Party|Receiving Party)\b", content_text, re.IGNORECASE)))
-        if not parties:
-            parties = ["Party A", "Party B"]
-
-        # Parse jurisdiction
-        jurisdiction_match = re.search(r"governed by the laws of (?:the State of |the Republic of )?([A-Za-z\s]+)", content_text, re.IGNORECASE)
-        jurisdiction = jurisdiction_match.group(1).strip() if jurisdiction_match else "General"
-
-        # Parse effective date
-        effective_date_match = re.search(r"effective as of ([A-Za-z0-9,\s]+|\d{4}-\d{2}-\d{2})", content_text, re.IGNORECASE)
-        effective_date = effective_date_match.group(1).strip() if effective_date_match else "2026-01-01"
-
-        # Parse clauses
         raw_sections = re.split(r"\n(?=(?:SECTION|CLAUSE|\d+\.|\d+\))\s+)", content_text, flags=re.IGNORECASE)
 
         clauses: list[ClauseObject] = []
@@ -72,16 +74,13 @@ class IngestionService:
             if not sec_text:
                 continue
 
-            # If the first segment is just a document header (e.g., "AGREEMENT") with no clause header, skip as standalone clause
             if not re.search(r"^(?:SECTION|CLAUSE|\d+\.|\d+\))", sec_text, re.IGNORECASE) and len(sec_text) < 100:
                 continue
 
             sec_lines = sec_text.split("\n", 1)
             header_line = sec_lines[0].strip()
-            body_text = sec_lines[1].strip() if len(sec_lines) > 1 else header_line
 
-            # Extract section name & title
-            sec_title_match = re.match(r"^((?:SECTION|CLAUSE|\d+\.|\d+\))\s*[A-Za-z0-9\.\s\-_:]+)", header_line, re.IGNORECASE)
+            sec_title_match = re.match(r"^((?:SECTION|CLAUSE|\d+\.|\d+\))\s*[A-Za-z0-9.\s_:-]+)", header_line, re.IGNORECASE)
             sec_title = sec_title_match.group(1).strip() if sec_title_match else f"Clause {clause_idx}"
             
             clause_id = f"CLAUSE_{doc_id}_{clause_idx:03d}"
@@ -90,7 +89,6 @@ class IngestionService:
             char_cursor = char_end + 1
             page_estimate = max(1, (char_start // 1800) + 1)
 
-            # Assign risk level heuristics
             risk = RiskLevel.LOW
             if re.search(r"\b(indemnify|liability|penalty|terminate|breach|confidential|jurisdiction|arbitration)\b", sec_text, re.IGNORECASE):
                 risk = RiskLevel.MEDIUM

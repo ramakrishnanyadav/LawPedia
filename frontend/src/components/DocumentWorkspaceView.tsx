@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { DocumentMetadata } from '../types';
 import { BentoDashboard } from './BentoDashboard';
 import { EvidenceGraphView } from './EvidenceGraphView';
-import { FileText, Cpu, Network, ArrowLeft, Layers, ShieldCheck } from 'lucide-react';
+import { FileText, Cpu, Network, ArrowLeft } from 'lucide-react';
 
 interface DocumentWorkspaceViewProps {
   document: DocumentMetadata;

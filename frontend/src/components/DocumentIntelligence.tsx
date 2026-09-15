@@ -1,6 +1,6 @@
 import React from 'react';
 import { DocumentMetadata } from '../types';
-import { Cpu, CheckCircle2, AlertTriangle, Shield, Clock } from 'lucide-react';
+import { Cpu } from 'lucide-react';
 
 interface DocumentIntelligenceProps {
   documents: DocumentMetadata[];
@@ -34,7 +34,7 @@ export const DocumentIntelligence: React.FC<DocumentIntelligenceProps> = ({ docu
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
           <span className="text-xs font-mono text-slate-500 uppercase">Governing Jurisdictions Detected</span>
           <p className="text-3xl font-extrabold text-amber-600">
-            {Array.from(new Set(documents.map((d) => d.jurisdiction))).length}
+            {new Set(documents.map((d) => d.jurisdiction)).size}
           </p>
         </div>
       </div>
