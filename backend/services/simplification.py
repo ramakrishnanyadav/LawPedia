@@ -3,6 +3,7 @@ Plain-Language Legal Simplification Engine (Grounded In Evidence Spans)
 """
 
 import re
+from typing import Optional
 from backend.schemas.eglr import EvidenceSpan
 from backend.services.safety import SafetyGateway
 
