@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LawyerHandoffPack } from '../types';
 import { Share2, Printer, Calendar, HelpCircle, FileText, Scale } from 'lucide-react';
+import { apiFetch } from '../api/client';
 
 interface LawyerHandoffViewProps {
   getAuthToken?: () => string;
@@ -17,13 +18,7 @@ export const LawyerHandoffView: React.FC<LawyerHandoffViewProps> = ({ getAuthTok
   const fetchHandoff = async () => {
     setLoading(true);
     try {
-      const token = (getAuthToken ? getAuthToken() : '') || localStorage.getItem('lawpedia_token') || '';
-      const res = await fetch('/api/handoff', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const res = await apiFetch('/api/handoff', { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         if (data && Array.isArray(data.parties_involved)) {

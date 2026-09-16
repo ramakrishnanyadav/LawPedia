@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Network, Table, Layers, Box } from 'lucide-react';
+import { apiFetch } from '../api/client';
 
 interface GraphNode {
   id: string;
@@ -26,12 +27,7 @@ export const EvidenceGraphView: React.FC<EvidenceGraphViewProps> = ({ getAuthTok
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
 
   useEffect(() => {
-    const token = (getAuthToken ? getAuthToken() : '') || localStorage.getItem('lawpedia_token') || '';
-    fetch('/api/graph', {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    })
+    apiFetch('/api/graph')
       .then((res) => {
         if (res.ok) return res.json();
         return null;
@@ -45,7 +41,7 @@ export const EvidenceGraphView: React.FC<EvidenceGraphViewProps> = ({ getAuthTok
         }
       })
       .catch((err) => console.error(err));
-  }, [getAuthToken]);
+  }, []);
 
 
   return (

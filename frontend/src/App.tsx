@@ -12,6 +12,7 @@ import { AccessibilityPreferences, AccessibilitySettings } from './components/Ac
 import { AuthModal } from './components/AuthModal';
 import { UserProfile, DEMO_USER } from './config/firebase';
 import { Calendar, AlertTriangle } from 'lucide-react';
+import { apiFetch } from './api/client';
 
 const DEFAULT_A11Y_SETTINGS: AccessibilitySettings = {
   textScale: 100,
@@ -48,11 +49,7 @@ export function App() {
 
   const fetchDocuments = async () => {
     try {
-      const res = await fetch('/api/documents', {
-        headers: {
-          'Authorization': `Bearer ${getAuthToken()}`
-        }
-      });
+      const res = await apiFetch('/api/documents');
       const data = await res.json();
       const docs = data.documents || [];
       setDocuments(docs);
@@ -62,12 +59,9 @@ export function App() {
   };
 
   const handleRunQuery = async (query: string): Promise<AskQueryResponse> => {
-    const res = await fetch('/api/query', {
+    const res = await apiFetch('/api/query', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${getAuthToken()}`
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query }),
     });
     return await res.json();
@@ -79,22 +73,16 @@ export function App() {
     formData.append('text_content', textContent);
     formData.append('document_version', version);
 
-    await fetch('/api/upload', {
+    await apiFetch('/api/upload', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${getAuthToken()}`
-      },
       body: formData,
     });
     await fetchDocuments();
   };
 
   const handleRunComparison = async (docAId: string, docBId: string): Promise<ComparisonResult> => {
-    const res = await fetch(`/api/compare?doc_a_id=${docAId}&doc_b_id=${docBId}`, {
+    const res = await apiFetch(`/api/compare?doc_a_id=${docAId}&doc_b_id=${docBId}`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${getAuthToken()}`
-      },
     });
     return await res.json();
   };
