@@ -18,10 +18,10 @@ RUN groupadd -g 1001 appuser && useradd -u 1001 -g appuser -m appuser \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy backend requirements & install Python dependencies from locked wheels
-COPY requirements.lock.txt requirements.txt ./
+# Copy backend requirements & install Python dependencies with cryptographic hash verification
+COPY requirements.txt requirements.lock.txt ./
 RUN pip install --no-cache-dir --only-binary=:all: "pip==24.3.1" \
- && pip install --no-cache-dir --only-binary=:all: -r requirements.lock.txt
+ && pip install --no-cache-dir --only-binary=:all: --require-hashes -r requirements.txt
 
 # Copy backend codebase
 COPY backend/ ./backend/
