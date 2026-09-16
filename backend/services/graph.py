@@ -94,21 +94,19 @@ class LegalEvidenceGraph:
         """
         conflicts = []
         clause_nodes = [n for n in self.nodes.values() if n["type"] == "Clause" and (tenant_id is None or n.get("tenant_id") == tenant_id)]
+        notice_clauses = [c for c in clause_nodes if "notice" in c["label"].lower()]
 
-        for i in range(len(clause_nodes)):
-            for j in range(i + 1, len(clause_nodes)):
-                c1 = clause_nodes[i]
-                c2 = clause_nodes[j]
-                
-                # Check for direct conflicts in notice period
-                if "notice" in c1["label"].lower() and "notice" in c2["label"].lower():
-                    if c1["text"] != c2["text"]:
-                        conflicts.append({
-                            "clause_a": c1["id"],
-                            "clause_b": c2["id"],
-                            "type": "NOTICE_PERIOD_MISMATCH",
-                            "description": f"Conflicting notice requirements between {c1['label']} and {c2['label']}"
-                        })
+        for i in range(len(notice_clauses)):
+            for j in range(i + 1, len(notice_clauses)):
+                c1 = notice_clauses[i]
+                c2 = notice_clauses[j]
+                if c1["text"] != c2["text"]:
+                    conflicts.append({
+                        "clause_a": c1["id"],
+                        "clause_b": c2["id"],
+                        "type": "NOTICE_PERIOD_MISMATCH",
+                        "description": f"Conflicting notice requirements between {c1['label']} and {c2['label']}"
+                    })
         return conflicts
 
     def get_exportable_graph(self, tenant_id: str = None) -> dict[str, Any]:
