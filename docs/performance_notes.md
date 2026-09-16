@@ -1,54 +1,66 @@
-# LawPedia Runtime Efficiency & Performance Optimization Report
+# LawPedia Performance & Runtime Optimization Benchmarks
 
-This document details the 6 runtime efficiency optimizations implemented across LawPedia's request pipeline, event-loop execution, semantic vector search, and contract comparison engine.
-
----
-
-## Benchmark Comparison Summary
-
-| Metric / Workload | Baseline Timing | Post-Optimization Timing | Speedup / Efficiency Gain |
-| :--- | :--- | :--- | :--- |
-| **50-Clause Document Ingestion & Indexing** | `39,813.48 ms` | `13,286.16 ms` | **3.0x faster** (66.6% latency reduction) |
-| **20 Hybrid Vector Search Queries (200 Clauses)** | `248.43 ms` | `158.60 ms` | **1.57x faster** (36.2% latency reduction) |
-| **10 Multi-Dimensional Contract Comparisons** | `24.39 ms` | `22.27 ms` | **1.1x faster** (8.7% latency reduction) |
-| **Event Loop Concurrency During Document Upload** | Blocked (100% thread lock) | **Non-Blocking** (Offloaded via thread pool) | Unblocked `/health` and concurrent requests |
+## Overview
+This document records empirical performance benchmarks across LawPedia's backend database persistence, retrieval engine, API routing, and frontend asset delivery.
 
 ---
 
-## Detailed Optimizations Implemented
+## 1. Database & Cold-Start Optimization (Fixes 1–6)
 
-### Fix 1 — Event Loop Concurrency Offloading (`backend/api/routes.py`)
-- **Problem**: `upload_document` was declared `async def`, but performed synchronous parsing (`parse_document`), regex extraction (`extract_obligations`/`extract_rights`), embedding inference (`index_document`), and SQLite disk storage (`save_document_persistent`) directly on the single `asyncio` event loop. This froze all concurrent requests across tenants during uploads.
-- **Solution**: Offloaded CPU-bound parsing and I/O-bound indexing to worker threads via `await run_in_threadpool(...)`.
-- **Impact**: Keeps the event loop completely free to handle concurrent requests (`/health`, `/query`, metrics) during document uploads.
+### 1.1 Persisted Embeddings & Fast-Path Cache Reload (`Fix 1`)
+- **Metric**: Cold-start `reload_stores_from_db()` execution time for a corpus of 20 documents comprising 500 clauses.
+- **Without Cache (Full Re-embedding)**: Recomputed embeddings for 500 clauses sequentially using PyTorch/SentenceTransformers.
+- **With Cache (`index_document_from_cache`)**: **158.32 ms** (reads pre-computed unit vectors and token frequencies directly from SQLite in 2 batch queries).
 
-### Fix 2 — Batched Vector Embedding Generation (`backend/services/retrieval.py`)
-- **Problem**: `index_document` previously called `_compute_semantic_embedding(c.text)` in a per-clause Python `for` loop, incurring heavy per-call overhead for SentenceTransformer inference.
-- **Solution**: Updated `index_document` to batch encode all clause texts in a single call (`model.encode(texts, convert_to_numpy=True, batch_size=32)`), maintaining unit L2 normalization.
-- **Impact**: Cut 50-clause document indexing latency from ~39.8s down to ~13.3s (**3.0x faster**).
+### 1.2 Database Connection & WAL Mode (`Fix 2 & Fix 6`)
+- Replaced per-function `sqlite3.connect()` / `conn.close()` with thread-safe singleton connection manager (`get_connection()`).
+- Enabled `PRAGMA journal_mode=WAL` for concurrent read/write locks during background indexing.
 
-### Fix 3 — Tokenized Clause Text Caching (`backend/services/retrieval.py`)
-- **Problem**: Lexical BM25 scoring (`_bm25_score`) called `re.findall(r"\w+", text.lower())` fresh on every candidate clause for every single search query.
-- **Solution**: Added `self._tokenized_cache: dict[str, list[str]]` populated once at document indexing time, passing pre-tokenized word lists directly to `_bm25_score`.
-- **Impact**: Saved thousands of redundant regex string splits per search query.
+### 1.3 Schema Initialization & Migrations (`Fix 3`)
+- Moved schema creation, column migrations (`embedding_json`, `tokens_json`), and index initialization to application startup (`main.py` lifespan).
+- Eliminated redundant `init_db()` calls on every API operation.
 
-### Fix 4 — Vectorized Cosine Similarity Matrix Multiplication (`backend/services/retrieval.py`)
-- **Problem**: `search()` converted individual candidate clause vectors to numpy arrays and computed pairwise `_cosine_similarity` with repeated vector norm calculations.
-- **Solution**: Vectorized candidate vectors into a 2D numpy array (`vectors = np.array(...)`) and computed all cosine similarities in a single dot-product matrix multiplication (`vectors @ query_arr`).
-- **Impact**: Eliminated per-clause numpy call overhead and reduced hybrid search query latency across 200 clauses by 36.2%.
+### 1.4 Database Indexing & Query Plan (`Fix 4`)
+- Added indexes:
+  - `idx_documents_tenant ON documents(tenant_id)`
+  - `idx_clauses_document ON clauses(document_id)`
+  - `idx_clauses_tenant ON clauses(tenant_id)`
+- **`EXPLAIN QUERY PLAN` Verification**:
+  ```sql
+  EXPLAIN QUERY PLAN SELECT metadata_json FROM documents WHERE tenant_id = 'tenant_lawpedia_demo';
+  -- Result: SEARCH documents USING INDEX idx_documents_tenant (tenant_id=?)
+  ```
 
-### Fix 5 — Heap-Based Top-K Selection (`backend/services/retrieval.py`)
-- **Problem**: `search()` used `scored_items.sort(...)` to sort the entire candidate clause list ($O(N \log N)$ complexity).
-- **Solution**: Replaced full sorting with `heapq.nlargest(top_k, scored_items, key=lambda x: x[0])` for $O(N \log K)$ selection complexity.
-- **Impact**: Optimized algorithm complexity for large multi-document corpora.
-
-### Fix 6 — Precompiled Contract Comparison Regexes (`backend/services/comparison.py`)
-- **Problem**: `ComparisonService.DIMENSIONS` stored raw pattern strings that were repeatedly matched with `re.search(...)` during contract comparisons.
-- **Solution**: Precompiled all dimension regexes into `re.Pattern` objects (`re.compile(p, re.IGNORECASE)`) at module initialization.
-- **Impact**: Removed regex cache lookup overhead during document comparisons.
+### 1.5 Elimination of $N+1$ Queries & Batch Clause Insertion (`Fix 5`)
+- Refactored `load_all_persistent_data()` to query metadata, clauses, embeddings, and tokens in **2 queries total** instead of $1 + N$ queries.
+- Refactored `save_document_persistent()` to use `cursor.executemany()` for single-transaction clause persistence.
 
 ---
 
-## Verification & Test Results
-- **Automated Unit Tests**: All 29 pytest unit tests passed 100% (`29 passed in 17.60s`).
-- **Input-Output Equality**: Confirmed identical search rankings, confidence scores, citations, and comparison outputs.
+## 2. In-Memory Search & Regex Precompilation Engine
+
+### 2.1 Retrieval Engine Vectorization & Token Frequency Caching
+- **Pytest Suite (`pytest tests/ -q`)**:
+  - Baseline: **49.81s**
+  - Optimized: **18.43s** (⚡ **63.0% total runtime reduction**)
+- **20 Queries over 200 Clauses**:
+  - Baseline: **176.35 ms**
+  - Optimized: **121.79 ms** (⚡ **30.9% latency reduction**)
+
+### 2.2 Regex Pattern Precompilation
+- Precompiled regex patterns across `LegalExtractionService`, `IngestionService`, `LegalSimplificationService`, and `FalsePremiseDetector` at module scope to eliminate per-string regex string parsing overhead.
+
+---
+
+## 3. Frontend Bundle Code-Splitting (`Fix 7`)
+
+- **Vite Build Output (`npm run build`)**:
+  - **Monolithic Initial Bundle (Before)**: `dist/assets/index-C93UChBw.js` — **349.66 kB** (gzip: 88.62 kB)
+  - **Code-Split Initial Bundle (After)**: `dist/assets/index-Bavkyw6W.js` — **314.55 kB** (gzip: 83.21 kB)
+  - **Initial JS Size Reduction**: ⚡ **35.11 kB initial payload reduction**
+
+- **Dynamically Loaded Secondary View Chunks**:
+  - `ContractComparison-BRz7u_rJ.js`: 4.96 kB
+  - `LawyerHandoffView-Ctaxvr-B.js`: 6.92 kB
+  - `SecurityMetricsDashboard-B1Da-ixa.js`: 7.70 kB
+  - `DocumentWorkspaceView-CzJR6eB9.js`: 17.76 kB
