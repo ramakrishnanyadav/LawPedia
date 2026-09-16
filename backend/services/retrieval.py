@@ -13,6 +13,7 @@ import os
 _logger = logging.getLogger("lawpedia.retrieval")
 
 _MODEL_INSTANCE = None
+_TEXT_EMBEDDING_CACHE: dict[str, list[float]] = {}
 
 
 def get_sentence_model():
@@ -59,6 +60,7 @@ class HybridRetrievalService:
         self.clauses: dict[str, list[ClauseObject]] = {}
         self.embedding_cache: dict[str, list[float]] = {}
         self._tokenized_cache: dict[str, list[str]] = {}
+        self._token_freq_cache: dict[str, dict[str, int]] = {}
         self._vocab: dict[str, int] = {}
 
     def get_model(self):
@@ -70,18 +72,26 @@ class HybridRetrievalService:
         """Tokenises clause text, caches the token list, and updates the vocab index."""
         words = re.findall(r"\w+", text.lower())
         self._tokenized_cache[clause_id] = words
+        freq: dict[str, int] = {}
         for w in words:
+            freq[w] = freq.get(w, 0) + 1
             if w not in self._vocab:
                 self._vocab[w] = len(self._vocab)
+        self._token_freq_cache[clause_id] = freq
         return words
 
     def _index_with_model(self, model, clauses: list[ClauseObject]) -> None:
         """Batch-encodes clauses using SentenceTransformer and caches normalised embeddings."""
-        texts = [c.text for c in clauses]
-        raw_embeddings = model.encode(texts, convert_to_numpy=True, batch_size=32)
-        for c, emb in zip(clauses, raw_embeddings):
-            norm = np.linalg.norm(emb)
-            self.embedding_cache[c.clause_id] = ((emb / norm) if norm > 0 else emb).tolist()
+        uncached = [c for c in clauses if c.text not in _TEXT_EMBEDDING_CACHE]
+        if uncached:
+            texts = [c.text for c in uncached]
+            raw_embeddings = model.encode(texts, convert_to_numpy=True, batch_size=32)
+            for c, emb in zip(uncached, raw_embeddings):
+                norm = np.linalg.norm(emb)
+                _TEXT_EMBEDDING_CACHE[c.text] = ((emb / norm) if norm > 0 else emb).tolist()
+
+        for c in clauses:
+            self.embedding_cache[c.clause_id] = _TEXT_EMBEDDING_CACHE[c.text]
             self._tokenize_and_update_vocab(c.clause_id, c.text)
 
     def _index_without_model(self, clauses: list[ClauseObject]) -> None:
@@ -109,13 +119,18 @@ class HybridRetrievalService:
         """
         Computes real dense 384-dimensional semantic vector embedding using SentenceTransformer.
         """
+        if text in _TEXT_EMBEDDING_CACHE:
+            return _TEXT_EMBEDDING_CACHE[text]
+
         model = self.get_model()
         if model is not None:
             embedding = model.encode(text, convert_to_numpy=True)
             norm = np.linalg.norm(embedding)
             if norm > 0:
                 embedding = embedding / norm
-            return embedding.tolist()
+            res = embedding.tolist()
+            _TEXT_EMBEDDING_CACHE[text] = res
+            return res
 
         # Fallback to dense character-level subword TF-IDF embedding if transformer model unavailable
         words = re.findall(r"\w+", text.lower())
@@ -130,7 +145,9 @@ class HybridRetrievalService:
         norm = np.linalg.norm(vec)
         if norm > 0:
             vec = vec / norm
-        return vec.tolist()
+        res = vec.tolist()
+        _TEXT_EMBEDDING_CACHE[text] = res
+        return res
 
     # ── scoring helpers ──────────────────────────────────────────────────────
 
@@ -144,18 +161,22 @@ class HybridRetrievalService:
             return 0.0
         return float(dot / (norm_a * norm_b))
 
-    def _bm25_score(self, query_terms: list[str], words: list[str]) -> float:
+    def _bm25_score(self, query_terms: list[str], freq: dict[str, int]) -> float:
         score = 0.0
         for term in query_terms:
-            count = words.count(term.lower())
+            count = freq.get(term.lower(), 0)
             if count > 0:
                 score += (count * 2.2) / (count + 1.2)
         return score
 
     def _hybrid_score(self, clause: ClauseObject, query_terms: list[str], v_score: float) -> float:
         """Combines vector and BM25 scores into a single hybrid score."""
-        words = self._tokenized_cache.get(clause.clause_id) or re.findall(r"\w+", clause.text.lower())
-        b_score = self._bm25_score(query_terms, words)
+        freq = self._token_freq_cache.get(clause.clause_id)
+        if freq is None:
+            words = self._tokenized_cache.get(clause.clause_id) or re.findall(r"\w+", clause.text.lower())
+            freq = {w: words.count(w) for w in set(words)}
+            self._token_freq_cache[clause.clause_id] = freq
+        b_score = self._bm25_score(query_terms, freq)
         return (float(v_score) * 0.75) + (min(b_score / 5.0, 1.0) * 0.25)
 
     # ── search helpers ───────────────────────────────────────────────────────
