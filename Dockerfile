@@ -21,9 +21,9 @@ RUN groupadd -g 1001 appuser && useradd -u 1001 -g appuser -m appuser \
 
 # Copy backend requirements & install Python dependencies
 COPY requirements.txt ./
-# Pin pip to a known version before installing to satisfy dependency-locking policy
-RUN pip install --no-cache-dir "pip==24.3.1" \
- && pip install --no-cache-dir --only-binary=:all: -r requirements.txt
+# Upgrade pip to a pinned version, then install project dependencies
+RUN pip install --no-cache-dir --only-binary=:all: "pip==24.3.1" \
+ && pip install --no-cache-dir -r requirements.txt
 
 # Copy backend codebase
 COPY backend/ ./backend/

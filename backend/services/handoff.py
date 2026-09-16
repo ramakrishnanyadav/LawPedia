@@ -80,6 +80,103 @@ class LawyerHandoffService:
             questions_for_lawyer=questions_for_lawyer
         )
 
+    # ── checklist helpers ────────────────────────────────────────────────────
+
+    @staticmethod
+    def _negotiate_items(clauses: list[ClauseObject]) -> list[ChecklistItem]:
+        """Returns negotiation items for HIGH/CRITICAL risk clauses that carry obligations."""
+        items = []
+        for c in clauses:
+            if c.risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL) and c.obligations:
+                items.append(ChecklistItem(
+                    category="NEGOTIATE",
+                    title=f"Risk clause: {c.title[:80]}",
+                    description=c.obligations[0].obligation_text[:120],
+                    clause_reference=f"{c.section}, page {c.page}",
+                    urgency="HIGH" if c.risk_level == RiskLevel.CRITICAL else "MEDIUM",
+                ))
+        return items
+
+    @staticmethod
+    def _red_flag_items(clauses: list[ClauseObject]) -> list[ChecklistItem]:
+        """Returns red-flag items for CRITICAL clauses and HIGH-risk clauses without obligations."""
+        items = []
+        for c in clauses:
+            if c.risk_level == RiskLevel.CRITICAL:
+                items.append(ChecklistItem(
+                    category="RED_FLAG",
+                    title=f"Critical clause: {c.title[:80]}",
+                    description=c.text[:150],
+                    clause_reference=f"{c.section}, page {c.page}",
+                    urgency="HIGH",
+                ))
+            elif c.risk_level == RiskLevel.HIGH and not c.obligations:
+                items.append(ChecklistItem(
+                    category="RED_FLAG",
+                    title=f"High-risk clause: {c.title[:80]}",
+                    description=c.text[:150],
+                    clause_reference=f"{c.section}, page {c.page}",
+                    urgency="MEDIUM",
+                ))
+        return items
+
+    @staticmethod
+    def _dates_from_documents(documents: list[DocumentMetadata]) -> list[ChecklistItem]:
+        """Returns deadline items derived from document-level effective/expiry dates."""
+        items = []
+        for d in documents:
+            if d.expiry_date:
+                items.append(ChecklistItem(
+                    category="DEADLINE",
+                    title=f"Contract Expiry — {d.filename}",
+                    description=f"Contract expires {d.expiry_date}. Ensure non-renewal or renewal notice is submitted well in advance.",
+                    clause_reference=f"Document metadata ({d.filename})",
+                    urgency="HIGH",
+                ))
+            if d.effective_date:
+                items.append(ChecklistItem(
+                    category="DEADLINE",
+                    title=f"Effective Date — {d.filename}",
+                    description=f"Agreement becomes effective {d.effective_date}.",
+                    clause_reference=f"Document metadata ({d.filename})",
+                    urgency="MEDIUM",
+                ))
+        return items
+
+    @staticmethod
+    def _dates_from_obligations(clauses: list[ClauseObject]) -> list[ChecklistItem]:
+        """Returns deadline items derived from obligation deadlines within clauses."""
+        items = []
+        for c in clauses:
+            for ob in c.obligations:
+                if ob.deadline:
+                    items.append(ChecklistItem(
+                        category="DEADLINE",
+                        title=f"Obligation deadline ({ob.party})",
+                        description=ob.obligation_text[:120],
+                        clause_reference=f"{c.section}, page {c.page}",
+                        urgency="HIGH",
+                    ))
+        return items
+
+    @staticmethod
+    def _empty_state_defaults(
+        things: list[ChecklistItem],
+        flags: list[ChecklistItem],
+        dates: list[ChecklistItem],
+    ) -> tuple[list[ChecklistItem], list[ChecklistItem], list[ChecklistItem]]:
+        """Substitutes honest empty-state messages for any category that found nothing."""
+        if not things:
+            things = [ChecklistItem(category="NEGOTIATE", title="No high-risk clauses flagged",
+                description="No HIGH or CRITICAL risk clauses with obligations were detected in this document.", urgency="LOW")]
+        if not flags:
+            flags = [ChecklistItem(category="RED_FLAG", title="No critical risk clauses detected",
+                description="No CRITICAL or unobligated HIGH risk clauses were found in this document.", urgency="LOW")]
+        if not dates:
+            dates = [ChecklistItem(category="DEADLINE", title="No key dates extracted",
+                description="No expiry dates, effective dates, or obligation deadlines were found in this document.", urgency="LOW")]
+        return things, flags, dates
+
     @staticmethod
     def generate_plain_english_checklist(
         documents: list[DocumentMetadata],
@@ -93,119 +190,23 @@ class LawyerHandoffService:
         checklist_id = f"CHECKLIST_{uuid.uuid4().hex[:8].upper()}"
         now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
-        things_to_negotiate: list[ChecklistItem] = []
-        risk_red_flags: list[ChecklistItem] = []
-        dates_not_to_miss: list[ChecklistItem] = []
-
-        for c in clauses:
-            # Negotiation items: HIGH or CRITICAL risk clauses with obligations
-            if c.risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL) and c.obligations:
-                obligation_text = c.obligations[0].obligation_text[:120]
-                things_to_negotiate.append(
-                    ChecklistItem(
-                        category="NEGOTIATE",
-                        title=f"Risk clause: {c.title[:80]}",
-                        description=obligation_text,
-                        clause_reference=f"{c.section}, page {c.page}",
-                        urgency="HIGH" if c.risk_level == RiskLevel.CRITICAL else "MEDIUM"
-                    )
-                )
-
-            # Red flags: CRITICAL risk clauses regardless of obligations
-            if c.risk_level == RiskLevel.CRITICAL:
-                risk_red_flags.append(
-                    ChecklistItem(
-                        category="RED_FLAG",
-                        title=f"Critical clause: {c.title[:80]}",
-                        description=c.text[:150],
-                        clause_reference=f"{c.section}, page {c.page}",
-                        urgency="HIGH"
-                    )
-                )
-            # Medium-risk red flags also surfaced (with MEDIUM urgency)
-            elif c.risk_level == RiskLevel.HIGH and not c.obligations:
-                risk_red_flags.append(
-                    ChecklistItem(
-                        category="RED_FLAG",
-                        title=f"High-risk clause: {c.title[:80]}",
-                        description=c.text[:150],
-                        clause_reference=f"{c.section}, page {c.page}",
-                        urgency="MEDIUM"
-                    )
-                )
-
-        # Key dates from document metadata
-        for d in documents:
-            if d.expiry_date:
-                dates_not_to_miss.append(
-                    ChecklistItem(
-                        category="DEADLINE",
-                        title=f"Contract Expiry — {d.filename}",
-                        description=f"Contract expires {d.expiry_date}. Ensure non-renewal or renewal notice is submitted well in advance.",
-                        clause_reference=f"Document metadata ({d.filename})",
-                        urgency="HIGH"
-                    )
-                )
-            if d.effective_date:
-                dates_not_to_miss.append(
-                    ChecklistItem(
-                        category="DEADLINE",
-                        title=f"Effective Date — {d.filename}",
-                        description=f"Agreement becomes effective {d.effective_date}.",
-                        clause_reference=f"Document metadata ({d.filename})",
-                        urgency="MEDIUM"
-                    )
-                )
-
-        # Obligation deadlines from clauses
-        for c in clauses:
-            for ob in c.obligations:
-                if ob.deadline:
-                    dates_not_to_miss.append(
-                        ChecklistItem(
-                            category="DEADLINE",
-                            title=f"Obligation deadline ({ob.party})",
-                            description=f"{ob.obligation_text[:120]}",
-                            clause_reference=f"{c.section}, page {c.page}",
-                            urgency="HIGH"
-                        )
-                    )
-
-        # Honest empty-state messages — never backfill with fabricated content
-        if not things_to_negotiate:
-            things_to_negotiate = [ChecklistItem(
-                category="NEGOTIATE",
-                title="No high-risk clauses flagged",
-                description="No HIGH or CRITICAL risk clauses with obligations were detected in this document.",
-                urgency="LOW"
-            )]
-        if not risk_red_flags:
-            risk_red_flags = [ChecklistItem(
-                category="RED_FLAG",
-                title="No critical risk clauses detected",
-                description="No CRITICAL or unobligated HIGH risk clauses were found in this document.",
-                urgency="LOW"
-            )]
-        if not dates_not_to_miss:
-            dates_not_to_miss = [ChecklistItem(
-                category="DEADLINE",
-                title="No key dates extracted",
-                description="No expiry dates, effective dates, or obligation deadlines were found in this document.",
-                urgency="LOW"
-            )]
-
-        action_items = [
-            "Confirm governing jurisdiction matches your local operating state.",
-            "Verify all referenced exhibits and schedules are attached before signing.",
-            "Schedule calendar reminders for all deadline dates listed above."
-        ]
+        things, flags, dates = LawyerHandoffService._empty_state_defaults(
+            LawyerHandoffService._negotiate_items(clauses),
+            LawyerHandoffService._red_flag_items(clauses),
+            LawyerHandoffService._dates_from_documents(documents)
+            + LawyerHandoffService._dates_from_obligations(clauses),
+        )
 
         return PlainEnglishChecklist(
             checklist_id=checklist_id,
             generated_at=now_str,
-            things_to_negotiate=things_to_negotiate,
-            dates_not_to_miss=dates_not_to_miss,
-            risk_red_flags=risk_red_flags,
-            action_items=action_items
+            things_to_negotiate=things,
+            dates_not_to_miss=dates,
+            risk_red_flags=flags,
+            action_items=[
+                "Confirm governing jurisdiction matches your local operating state.",
+                "Verify all referenced exhibits and schedules are attached before signing.",
+                "Schedule calendar reminders for all deadline dates listed above.",
+            ],
         )
 
