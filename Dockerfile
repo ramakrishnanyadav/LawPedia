@@ -12,23 +12,20 @@ RUN npm run build
 FROM python:3.11-slim AS runner
 WORKDIR /app
 
-# Create non-root user and install system dependencies
+# Create non-root user and install system dependencies (curl for healthcheck)
 RUN groupadd -g 1001 appuser && useradd -u 1001 -g appuser -m appuser \
     && apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy backend requirements & install Python dependencies
-COPY requirements.txt ./
-# Upgrade pip to a pinned version, then install project dependencies
+# Copy backend requirements & install Python dependencies from locked wheels
+COPY requirements.lock.txt requirements.txt ./
 RUN pip install --no-cache-dir --only-binary=:all: "pip==24.3.1" \
- && pip install --no-cache-dir -r requirements.txt
+ && pip install --no-cache-dir --only-binary=:all: -r requirements.lock.txt
 
 # Copy backend codebase
 COPY backend/ ./backend/
 COPY docs/ ./docs/
-COPY tests/ ./tests/
 COPY .env.example ./.env
 
 # Copy built frontend assets from builder stage
