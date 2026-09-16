@@ -92,10 +92,32 @@ def readiness_probe():
 
 app.include_router(router, prefix="/api")
 
-# Mount static frontend build files if dist folder exists (Render/Production hostable)
+from fastapi.responses import FileResponse
+
+# Mount static frontend build files if dist folder exists (Render/Production hostable SPA)
 frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
+
 if os.path.exists(frontend_dist):
-    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="static")
+    assets_dir = os.path.join(frontend_dist, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa_frontend(request: Request, full_path: str):
+        if full_path.startswith("api") or full_path in ("health", "ready", "metrics", "docs", "openapi.json", "redoc"):
+            raise HTTPException(status_code=404, detail="API route not found")
+
+        file_path = os.path.join(frontend_dist, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+
+        index_path = os.path.join(frontend_dist, "index.html")
+        if os.path.isfile(index_path):
+            return FileResponse(index_path)
+
+        raise HTTPException(status_code=404, detail="SPA index.html missing")
+else:
+    logger.warning(f"Notice: Frontend dist directory not found at {frontend_dist}. Running API-only mode.")
 
 
 def seed_demo_data():
