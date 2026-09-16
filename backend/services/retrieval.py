@@ -64,6 +64,31 @@ class HybridRetrievalService:
     def get_model(self):
         return get_sentence_model()
 
+    # ── index helpers ────────────────────────────────────────────────────────
+
+    def _tokenize_and_update_vocab(self, clause_id: str, text: str) -> list[str]:
+        """Tokenises clause text, caches the token list, and updates the vocab index."""
+        words = re.findall(r"\w+", text.lower())
+        self._tokenized_cache[clause_id] = words
+        for w in words:
+            if w not in self._vocab:
+                self._vocab[w] = len(self._vocab)
+        return words
+
+    def _index_with_model(self, model, clauses: list[ClauseObject]) -> None:
+        """Batch-encodes clauses using SentenceTransformer and caches normalised embeddings."""
+        texts = [c.text for c in clauses]
+        raw_embeddings = model.encode(texts, convert_to_numpy=True, batch_size=32)
+        for c, emb in zip(clauses, raw_embeddings):
+            norm = np.linalg.norm(emb)
+            self.embedding_cache[c.clause_id] = ((emb / norm) if norm > 0 else emb).tolist()
+            self._tokenize_and_update_vocab(c.clause_id, c.text)
+
+    def _index_without_model(self, clauses: list[ClauseObject]) -> None:
+        """Indexes clauses using the fallback hash embedding when no transformer is available."""
+        for c in clauses:
+            self._tokenize_and_update_vocab(c.clause_id, c.text)
+            self.embedding_cache[c.clause_id] = self._compute_semantic_embedding(c.text)
 
     def index_document(self, metadata: DocumentMetadata, clauses: list[ClauseObject]) -> None:
         """
@@ -74,26 +99,11 @@ class HybridRetrievalService:
 
         model = self.get_model()
         if model is not None and clauses:
-            texts = [c.text for c in clauses]
-            raw_embeddings = model.encode(texts, convert_to_numpy=True, batch_size=32)
-            for c, emb in zip(clauses, raw_embeddings):
-                norm = np.linalg.norm(emb)
-                normalized = (emb / norm) if norm > 0 else emb
-                self.embedding_cache[c.clause_id] = normalized.tolist()
-
-                words = re.findall(r"\w+", c.text.lower())
-                self._tokenized_cache[c.clause_id] = words
-                for w in words:
-                    if w not in self._vocab:
-                        self._vocab[w] = len(self._vocab)
+            self._index_with_model(model, clauses)
         else:
-            for c in clauses:
-                words = re.findall(r"\w+", c.text.lower())
-                self._tokenized_cache[c.clause_id] = words
-                for w in words:
-                    if w not in self._vocab:
-                        self._vocab[w] = len(self._vocab)
-                self.embedding_cache[c.clause_id] = self._compute_semantic_embedding(c.text)
+            self._index_without_model(clauses)
+
+    # ── embedding ────────────────────────────────────────────────────────────
 
     def _compute_semantic_embedding(self, text: str) -> list[float]:
         """
@@ -107,7 +117,6 @@ class HybridRetrievalService:
                 embedding = embedding / norm
             return embedding.tolist()
 
-        
         # Fallback to dense character-level subword TF-IDF embedding if transformer model unavailable
         words = re.findall(r"\w+", text.lower())
         vec = np.zeros(384, dtype=np.float32)
@@ -123,6 +132,7 @@ class HybridRetrievalService:
             vec = vec / norm
         return vec.tolist()
 
+    # ── scoring helpers ──────────────────────────────────────────────────────
 
     def _cosine_similarity(self, v1: list[float], v2: list[float]) -> float:
         a = np.array(v1, dtype=np.float32)
@@ -142,12 +152,59 @@ class HybridRetrievalService:
                 score += (count * 2.2) / (count + 1.2)
         return score
 
+    def _hybrid_score(self, clause: ClauseObject, query_terms: list[str], v_score: float) -> float:
+        """Combines vector and BM25 scores into a single hybrid score."""
+        words = self._tokenized_cache.get(clause.clause_id) or re.findall(r"\w+", clause.text.lower())
+        b_score = self._bm25_score(query_terms, words)
+        return (float(v_score) * 0.75) + (min(b_score / 5.0, 1.0) * 0.25)
+
+    # ── search helpers ───────────────────────────────────────────────────────
+
+    def _collect_candidates(
+        self,
+        tenant_id: str,
+        target_document_ids: Optional[list[str]],
+    ) -> list[tuple[ClauseObject, DocumentMetadata]]:
+        """Returns all clause/metadata pairs for the given tenant, filtered by document IDs."""
+        candidates: list[tuple[ClauseObject, DocumentMetadata]] = []
+        for doc_id, meta in self.documents.items():
+            if meta.tenant_id != tenant_id:
+                continue  # STRICT TENANT ISOLATION
+            if target_document_ids and doc_id not in target_document_ids:
+                continue
+            for c in self.clauses.get(doc_id, []):
+                candidates.append((c, meta))
+        return candidates
+
+    def _build_evidence_span(self, clause: ClauseObject, meta: DocumentMetadata, score: float) -> EvidenceSpan:
+        """Constructs an EvidenceSpan from a ranked clause result."""
+        sec_str = (
+            clause.section
+            if (clause.section.startswith("Section") or clause.section == "General")
+            else f"Section {clause.section}"
+        )
+        return EvidenceSpan(
+            source_document_id=meta.document_id,
+            document_name=meta.filename,
+            page=clause.page,
+            section=clause.section,
+            clause_id=clause.clause_id,
+            evidence_span=clause.text,
+            citation=f"{sec_str}, page {clause.page}",
+            document_version=meta.document_version,
+            effective_date=meta.effective_date,
+            jurisdiction=meta.jurisdiction,
+            retrieval_confidence=round(float(score), 4),
+        )
+
+    # ── public search ────────────────────────────────────────────────────────
+
     def search(
         self,
         query: str,
         tenant_id: str,
         target_document_ids: Optional[list[str]] = None,
-        top_k: int = 5
+        top_k: int = 5,
     ) -> list[EvidenceSpan]:
         """
         Executes hybrid search across tenant documents and returns ranked EvidenceSpans.
@@ -155,57 +212,23 @@ class HybridRetrievalService:
         query_terms = re.findall(r"\w+", query.lower())
         query_vec = self._compute_semantic_embedding(query)
 
-        candidate_clauses: list[tuple[ClauseObject, DocumentMetadata]] = []
-
-        # Filter documents by tenant_id and target_document_ids
-        for doc_id, meta in self.documents.items():
-            if meta.tenant_id != tenant_id:
-                continue  # STRICT TENANT ISOLATION
-            if target_document_ids and doc_id not in target_document_ids:
-                continue
-            
-            for c in self.clauses.get(doc_id, []):
-                candidate_clauses.append((c, meta))
-
-        if not candidate_clauses:
+        candidates = self._collect_candidates(tenant_id, target_document_ids)
+        if not candidates:
             return []
 
         # Vectorized cosine similarity (dot product of pre-normalized unit vectors)
-        vectors = np.array([
-            self.embedding_cache.get(c.clause_id) or self._compute_semantic_embedding(c.text)
-            for c, _ in candidate_clauses
-        ], dtype=np.float32)
-        query_arr = np.array(query_vec, dtype=np.float32)
-        v_scores = vectors @ query_arr
+        vectors = np.array(
+            [self.embedding_cache.get(c.clause_id) or self._compute_semantic_embedding(c.text) for c, _ in candidates],
+            dtype=np.float32,
+        )
+        v_scores = vectors @ np.array(query_vec, dtype=np.float32)
 
-        scored_items = []
-        for (c, meta), v_score in zip(candidate_clauses, v_scores):
-            words = self._tokenized_cache.get(c.clause_id) or re.findall(r"\w+", c.text.lower())
-            b_score = self._bm25_score(query_terms, words)
-            hybrid_score = (float(v_score) * 0.75) + (min(b_score / 5.0, 1.0) * 0.25)
-            scored_items.append((hybrid_score, c, meta))
+        scored_items = [
+            (self._hybrid_score(c, query_terms, v_score), c, meta)
+            for (c, meta), v_score in zip(candidates, v_scores)
+        ]
 
         # Heap top-K selection O(N log K) instead of full sort O(N log N)
         top_items = heapq.nlargest(top_k, scored_items, key=lambda x: x[0])
 
-        spans: list[EvidenceSpan] = []
-        for score, clause, meta in top_items:
-            sec_str = clause.section if (clause.section.startswith("Section") or clause.section == "General") else f"Section {clause.section}"
-            citation_str = f"{sec_str}, page {clause.page}"
-            spans.append(
-                EvidenceSpan(
-                    source_document_id=meta.document_id,
-                    document_name=meta.filename,
-                    page=clause.page,
-                    section=clause.section,
-                    clause_id=clause.clause_id,
-                    evidence_span=clause.text,
-                    citation=citation_str,
-                    document_version=meta.document_version,
-                    effective_date=meta.effective_date,
-                    jurisdiction=meta.jurisdiction,
-                    retrieval_confidence=round(float(score), 4)
-                )
-            )
-
-        return spans
+        return [self._build_evidence_span(clause, meta, score) for score, clause, meta in top_items]
