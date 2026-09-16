@@ -1,18 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { DocumentMetadata, AskQueryResponse, ComparisonResult } from './types';
 import { Navbar } from './components/Navbar';
 import { AskWorkspace } from './components/AskWorkspace';
 import { DocumentLibrary } from './components/DocumentLibrary';
-import { DocumentWorkspaceView } from './components/DocumentWorkspaceView';
-import { ContractComparison } from './components/ContractComparison';
-import { LawyerHandoffView } from './components/LawyerHandoffView';
-import { SecurityMetricsDashboard } from './components/SecurityMetricsDashboard';
 import { CommandPalette } from './components/CommandPalette';
 import { AccessibilityPreferences, AccessibilitySettings } from './components/AccessibilityPreferences';
 import { AuthModal } from './components/AuthModal';
 import { UserProfile, DEMO_USER } from './config/firebase';
 import { Calendar, AlertTriangle } from 'lucide-react';
 import { apiFetch } from './api/client';
+
+const DocumentWorkspaceView = lazy(() => import('./components/DocumentWorkspaceView').then(m => ({ default: m.DocumentWorkspaceView })));
+const ContractComparison = lazy(() => import('./components/ContractComparison').then(m => ({ default: m.ContractComparison })));
+const LawyerHandoffView = lazy(() => import('./components/LawyerHandoffView').then(m => ({ default: m.LawyerHandoffView })));
+const SecurityMetricsDashboard = lazy(() => import('./components/SecurityMetricsDashboard').then(m => ({ default: m.SecurityMetricsDashboard })));
 
 const DEFAULT_A11Y_SETTINGS: AccessibilitySettings = {
   textScale: 100,
@@ -145,50 +146,52 @@ export function App() {
 
       {/* Main Accessible Target Container */}
       <main id="main-content" tabIndex={-1} className="flex-1 max-w-7xl w-full mx-auto px-6 py-8 outline-none">
-        {activeTab === 'library' && !selectedDocument && (
-          <DocumentLibrary
-            documents={documents}
-            onUpload={handleUpload}
-            onSelectDocument={(doc) => setSelectedDocument(doc)}
-          />
-        )}
+        <Suspense fallback={<div className="p-6 text-sm text-slate-500 font-mono animate-pulse">Loading view module...</div>}>
+          {activeTab === 'library' && !selectedDocument && (
+            <DocumentLibrary
+              documents={documents}
+              onUpload={handleUpload}
+              onSelectDocument={(doc) => setSelectedDocument(doc)}
+            />
+          )}
 
-        {activeTab === 'library' && selectedDocument && (
-          <DocumentWorkspaceView
-            document={selectedDocument}
-            documents={documents}
-            onBack={() => setSelectedDocument(null)}
-            onNavigateToTab={(t) => setActiveTab(t)}
-            disable3DGraph={a11ySettings.disable3DGraph}
-          />
-        )}
+          {activeTab === 'library' && selectedDocument && (
+            <DocumentWorkspaceView
+              document={selectedDocument}
+              documents={documents}
+              onBack={() => setSelectedDocument(null)}
+              onNavigateToTab={(t) => setActiveTab(t)}
+              disable3DGraph={a11ySettings.disable3DGraph}
+            />
+          )}
 
-        {activeTab === 'ask' && <AskWorkspace onRunQuery={handleRunQuery} />}
+          {activeTab === 'ask' && <AskWorkspace onRunQuery={handleRunQuery} />}
 
-        {activeTab === 'compare' && (
-          <ContractComparison documents={documents} onRunComparison={handleRunComparison} />
-        )}
+          {activeTab === 'compare' && (
+            <ContractComparison documents={documents} onRunComparison={handleRunComparison} />
+          )}
 
-        {activeTab === 'dates' && (
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-amber-600" /> Important Dates & Contract Timeline
-            </h2>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200 font-mono text-xs">
-                <span>Master Agreement v1.0 Effective Date:</span>
-                <span className="font-bold text-slate-900">2026-01-01</span>
-              </div>
-              <div className="flex items-center justify-between p-4 bg-amber-50 rounded-xl border border-amber-200 font-mono text-xs text-amber-900">
-                <span className="font-bold">Amendment v2.0 Revision Date:</span>
-                <span className="font-bold text-amber-900">2026-06-01</span>
+          {activeTab === 'dates' && (
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-amber-600" /> Important Dates & Contract Timeline
+              </h2>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200 font-mono text-xs">
+                  <span>Master Agreement v1.0 Effective Date:</span>
+                  <span className="font-bold text-slate-900">2026-01-01</span>
+                </div>
+                <div className="flex items-center justify-between p-4 bg-amber-50 rounded-xl border border-amber-200 font-mono text-xs text-amber-900">
+                  <span className="font-bold">Amendment v2.0 Revision Date:</span>
+                  <span className="font-bold text-amber-900">2026-06-01</span>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {activeTab === 'handoff' && <LawyerHandoffView getAuthToken={getAuthToken} />}
-        {activeTab === 'security' && <SecurityMetricsDashboard />}
+          {activeTab === 'handoff' && <LawyerHandoffView getAuthToken={getAuthToken} />}
+          {activeTab === 'security' && <SecurityMetricsDashboard />}
+        </Suspense>
       </main>
 
       <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500 font-mono">
