@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.config import settings
 from backend.api.routes import router
 from backend.services.retrieval import get_embedding_backend_type
-from backend.services.db import DB_PATH
+from backend.services.db import DB_PATH, init_db
 
 # Configure Structured JSON Logging
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -22,6 +22,9 @@ logger = logging.getLogger("lawpedia")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Initialize database schema, columns, and indexes once on process startup
+    init_db()
+
     # Production + demo mode misconfiguration guard
     if settings.ENV == "production" and settings.LAWPEDIA_DEMO_MODE:
         logger.critical(

@@ -113,6 +113,37 @@ class HybridRetrievalService:
         else:
             self._index_without_model(clauses)
 
+    def index_document_from_cache(
+        self,
+        metadata: DocumentMetadata,
+        clauses: list[ClauseObject],
+        embeddings: dict[str, list[float]],
+        tokens: dict[str, list[str]]
+    ) -> None:
+        """
+        Reuses persisted embeddings and tokens instead of recomputing via model.
+        Falls back to index_document() for any clauses missing cached data.
+        """
+        self.documents[metadata.document_id] = metadata
+        self.clauses[metadata.document_id] = clauses
+        missing = []
+
+        for c in clauses:
+            if c.clause_id in embeddings and c.clause_id in tokens:
+                self.embedding_cache[c.clause_id] = embeddings[c.clause_id]
+                self._tokenized_cache[c.clause_id] = tokens[c.clause_id]
+                freq: dict[str, int] = {}
+                for w in tokens[c.clause_id]:
+                    freq[w] = freq.get(w, 0) + 1
+                    if w not in self._vocab:
+                        self._vocab[w] = len(self._vocab)
+                self._token_freq_cache[c.clause_id] = freq
+            else:
+                missing.append(c)
+
+        if missing:
+            self.index_document(metadata, missing)
+
     # ── embedding ────────────────────────────────────────────────────────────
 
     def _compute_semantic_embedding(self, text: str) -> list[float]:

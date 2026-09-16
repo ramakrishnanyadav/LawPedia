@@ -39,12 +39,13 @@ clauses_store = {}
 
 def reload_stores_from_db():
     """
-    Reloads persisted documents and clauses from SQLite into memory indexes.
+    Reloads persisted documents and clauses from SQLite into memory indexes
+    using the cache-aware index_document_from_cache path to avoid cold-start re-embedding.
     """
-    for meta, clauses in load_all_persistent_data():
+    for meta, clauses, embeddings, tokens in load_all_persistent_data():
         documents_store[meta.document_id] = meta
         clauses_store[meta.document_id] = clauses
-        retrieval_service.index_document(meta, clauses)
+        retrieval_service.index_document_from_cache(meta, clauses, embeddings, tokens)
         evidence_graph.add_document_subgraph(meta, clauses)
 
 
@@ -117,10 +118,15 @@ async def upload_document(
             retrieval_service.index_document(metadata, clauses)
             evidence_graph.add_document_subgraph(metadata, clauses)
 
-            # Store in-memory and persist to SQLite disk database
+            # Store in-memory and persist to SQLite disk database with cached embeddings & tokens
             documents_store[metadata.document_id] = metadata
             clauses_store[metadata.document_id] = clauses
-            save_document_persistent(metadata, clauses)
+            save_document_persistent(
+                metadata,
+                clauses,
+                retrieval_service.embedding_cache,
+                retrieval_service._tokenized_cache
+            )
 
         await run_in_threadpool(_extract_and_index)
 
