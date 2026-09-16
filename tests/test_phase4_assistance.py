@@ -103,6 +103,11 @@ def test_comparison_side_by_side_delta():
 
 
 def test_plain_english_checklist_service():
+    """
+    Verifies that the plain-English checklist derives content from actual uploaded clauses,
+    not from hardcoded fabricated section references. A regression back to hardcoded output
+    should cause this test to fail.
+    """
     meta = DocumentMetadata(
         document_id="doc_chk_1",
         filename="SLA_Agreement.pdf",
@@ -113,23 +118,96 @@ def test_plain_english_checklist_service():
         tenant_id="tenant_chk",
         upload_timestamp="2026-09-16T00:00:00Z"
     )
-    clauses = [
-        ClauseObject(
-            clause_id="c_chk_1",
-            document_id="doc_chk_1",
-            section="Section 4",
-            title="Notice",
-            text="Notice of 90 days required.",
-            page=1,
-            char_start=0,
-            char_end=30
-        )
-    ]
-    checklist = LawyerHandoffService.generate_plain_english_checklist([meta], clauses)
+    from backend.schemas.eglr import Obligation, RiskLevel
 
-    assert len(checklist.things_to_negotiate) >= 3
+    high_risk_clause = ClauseObject(
+        clause_id="c_chk_high",
+        document_id="doc_chk_1",
+        section="Section 7",
+        title="Unlimited Liability Exposure",
+        text="Vendor shall be liable for all damages, direct and indirect, without limit.",
+        page=2,
+        char_start=0,
+        char_end=80,
+        risk_level=RiskLevel.CRITICAL,
+        obligations=[
+            Obligation(
+                party="Vendor",
+                obligation_text="Vendor must cover all damages without cap.",
+                clause_id="c_chk_high"
+            )
+        ]
+    )
+    low_risk_clause = ClauseObject(
+        clause_id="c_chk_low",
+        document_id="doc_chk_1",
+        section="Section 4",
+        title="Notice",
+        text="Notice of 90 days required.",
+        page=1,
+        char_start=0,
+        char_end=30,
+        risk_level=RiskLevel.LOW
+    )
+
+    checklist = LawyerHandoffService.generate_plain_english_checklist([meta], [high_risk_clause, low_risk_clause])
+
+    # Must have content
+    assert len(checklist.things_to_negotiate) >= 1
     assert len(checklist.dates_not_to_miss) >= 1
-    assert len(checklist.risk_red_flags) >= 2
+    assert len(checklist.risk_red_flags) >= 1
+
+    # Content must be grounded in actual clause text — NOT fabricated static references
+    negotiate_refs = [item.clause_reference for item in checklist.things_to_negotiate if item.clause_reference]
+    red_flag_refs = [item.clause_reference for item in checklist.risk_red_flags if item.clause_reference]
+
+    # The real clause is Section 7 page 2 — must appear, not "Section 8" or "Section 14.1"
+    assert any("Section 7" in ref for ref in negotiate_refs + red_flag_refs), \
+        "Checklist must reference actual clause section (Section 7), not hardcoded fabricated sections"
+    assert not any("Section 8" in ref or "Section 14.1" in ref or "Section 6.2" in ref
+                   for ref in negotiate_refs + red_flag_refs), \
+        "Checklist must not contain hardcoded fabricated section references"
+
+    # Description must trace back to actual clause obligation text
+    negotiate_descriptions = [item.description for item in checklist.things_to_negotiate]
+    assert any("Vendor" in desc or "damages" in desc.lower() for desc in negotiate_descriptions), \
+        "Negotiate item must reference real obligation text from the clause"
+
+
+def test_plain_english_checklist_empty_state():
+    """
+    Verifies that an empty, honest checklist is returned when document has no risk clauses —
+    not fabricated placeholder content.
+    """
+    meta = DocumentMetadata(
+        document_id="doc_empty_1",
+        filename="Simple_Agreement.pdf",
+        title="Simple Agreement",
+        mime_type="application/pdf",
+        page_count=1,
+        clause_count=1,
+        tenant_id="tenant_empty",
+        upload_timestamp="2026-09-16T00:00:00Z"
+    )
+    low_clause = ClauseObject(
+        clause_id="c_empty_1",
+        document_id="doc_empty_1",
+        section="Section 1",
+        title="Scope",
+        text="Parties agree to cooperate.",
+        page=1,
+        char_start=0,
+        char_end=30
+    )
+    checklist = LawyerHandoffService.generate_plain_english_checklist([meta], [low_clause])
+
+    # Empty state must be honest — no fabricated content
+    assert len(checklist.things_to_negotiate) == 1
+    assert "No high-risk" in checklist.things_to_negotiate[0].title
+    assert len(checklist.risk_red_flags) == 1
+    assert "No critical" in checklist.risk_red_flags[0].title
+    assert len(checklist.dates_not_to_miss) == 1
+    assert "No key dates" in checklist.dates_not_to_miss[0].title
 
 
 def test_checklist_api_endpoint(monkeypatch):
