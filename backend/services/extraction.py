@@ -7,6 +7,16 @@ from typing import Optional
 from backend.schemas.eglr import ClauseObject, Obligation, RiskLevel
 from backend.services.safety import SafetyGateway
 
+_RE_OBLIGATION_KEYWORD = re.compile(r"\b(shall|must|agrees to|is required to|covenants|undertakes to|shall maintain|shall keep)\b", re.IGNORECASE)
+_RE_CONDITION = re.compile(r"\b(if|provided that|subject to|in the event of)\s+([^,.;]+)", re.IGNORECASE)
+_RE_DEADLINES = [
+    re.compile(r"\bwithin \d+ (?:days?|months?|years?)\b", re.IGNORECASE),
+    re.compile(r"\bprior to [^,.;]+", re.IGNORECASE),
+    re.compile(r"\bno later than [^,.;]+", re.IGNORECASE)
+]
+_RE_PENALTY = re.compile(r"\b(?:penalty|cure period|late fee|liquidated damages) of [^,.;]+|\binterest at \d+%", re.IGNORECASE)
+_RE_RIGHTS_KEYWORD = re.compile(r"\b(may|entitled to|reserves the right to|has the right|shall be permitted to)\b", re.IGNORECASE)
+
 
 class LegalExtractionService:
     """
@@ -38,29 +48,30 @@ class LegalExtractionService:
 
     @classmethod
     def _parse_sentence_obligation(cls, sent_clean: str, clause: ClauseObject) -> Optional[Obligation]:
-        if not re.search(r"\b(shall|must|agrees to|is required to|covenants|undertakes to|shall maintain|shall keep)\b", sent_clean, re.IGNORECASE):
+        if not _RE_OBLIGATION_KEYWORD.search(sent_clean):
             return None
 
         party = "Party A"
+        sent_lower = sent_clean.lower()
         for p in clause.entities:
-            if p.lower() in sent_clean.lower():
+            if p.lower() in sent_lower:
                 party = p
                 break
 
-        cond_match = re.search(r"\b(if|provided that|subject to|in the event of)\s+([^,.;]+)", sent_clean, re.IGNORECASE)
+        cond_match = _RE_CONDITION.search(sent_clean)
         cond_text = cond_match.group(0).strip() if cond_match else None
 
         deadline = None
-        for pat in (r"\bwithin \d+ (?:days?|months?|years?)\b", r"\bprior to [^,.;]+", r"\bno later than [^,.;]+"):
-            m = re.search(pat, sent_clean, re.IGNORECASE)
+        for pat in _RE_DEADLINES:
+            m = pat.search(sent_clean)
             if m:
                 deadline = m.group(0).strip()
                 break
 
-        penalty_match = re.search(r"\b(?:penalty|cure period|late fee|liquidated damages) of [^,.;]+|\binterest at \d+%", sent_clean, re.IGNORECASE)
+        penalty_match = _RE_PENALTY.search(sent_clean)
         penalty = penalty_match.group(0).strip() if penalty_match else None
 
-        risk = RiskLevel.HIGH if any(kw in sent_clean.lower() for kw in ("sole discretion", "immediate termination", "unlimited liability")) else RiskLevel.MEDIUM
+        risk = RiskLevel.HIGH if any(kw in sent_lower for kw in ("sole discretion", "immediate termination", "unlimited liability")) else RiskLevel.MEDIUM
 
         return Obligation(
             party=party,
@@ -102,8 +113,9 @@ class LegalExtractionService:
         sentences = re.split(r"(?<=[.!?])\s+", sanitized_text)
         for sent in sentences:
             sent_clean = sent.strip()
-            if re.search(r"\b(may|entitled to|reserves the right to|has the right|shall be permitted to)\b", sent_clean, re.IGNORECASE):
+            if _RE_RIGHTS_KEYWORD.search(sent_clean):
                 if cls._is_grounded_in_clause(sent_clean, clause.text):
                     rights.append(sent_clean)
         return rights
+
 
