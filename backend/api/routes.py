@@ -35,6 +35,8 @@ retrieval_service = HybridRetrievalService()
 evidence_graph = LegalEvidenceGraph()
 documents_store = {}
 clauses_store = {}
+tenant_documents_store: dict[str, list[DocumentMetadata]] = {}
+tenant_clauses_store: dict[str, list[ClauseObject]] = {}
 
 
 def reload_stores_from_db():
@@ -42,9 +44,17 @@ def reload_stores_from_db():
     Reloads persisted documents and clauses from SQLite into memory indexes
     using the cache-aware index_document_from_cache path to avoid cold-start re-embedding.
     """
+    documents_store.clear()
+    clauses_store.clear()
+    tenant_documents_store.clear()
+    tenant_clauses_store.clear()
+
     for meta, clauses, embeddings, tokens in load_all_persistent_data():
         documents_store[meta.document_id] = meta
         clauses_store[meta.document_id] = clauses
+        tenant_documents_store.setdefault(meta.tenant_id, []).append(meta)
+        tenant_clauses_store.setdefault(meta.tenant_id, []).extend(clauses)
+
         retrieval_service.index_document_from_cache(meta, clauses, embeddings, tokens)
         evidence_graph.add_document_subgraph(meta, clauses)
 
@@ -121,6 +131,9 @@ async def upload_document(
             # Store in-memory and persist to SQLite disk database with cached embeddings & tokens
             documents_store[metadata.document_id] = metadata
             clauses_store[metadata.document_id] = clauses
+            tenant_documents_store.setdefault(tenant_id, []).append(metadata)
+            tenant_clauses_store.setdefault(tenant_id, []).extend(clauses)
+
             save_document_persistent(
                 metadata,
                 clauses,
@@ -153,7 +166,7 @@ def list_documents(user: AuthenticatedUser = Depends(verify_firebase_token)):
     """
     Lists uploaded documents filtered strictly by verified tenant isolation.
     """
-    docs = [meta for meta in documents_store.values() if meta.tenant_id == user.tenant_id]
+    docs = tenant_documents_store.get(user.tenant_id, [])
     return {"documents": docs}
 
 
@@ -294,10 +307,8 @@ def generate_handoff(user: AuthenticatedUser = Depends(verify_firebase_token)):
     Generates the 10-section Lawyer Handoff Pack for authenticated tenant.
     """
     tenant_id = user.tenant_id
-    tenant_docs = [meta for meta in documents_store.values() if meta.tenant_id == tenant_id]
-    tenant_clauses = []
-    for d in tenant_docs:
-        tenant_clauses.extend(clauses_store.get(d.document_id, []))
+    tenant_docs = tenant_documents_store.get(tenant_id, [])
+    tenant_clauses = tenant_clauses_store.get(tenant_id, [])
 
     spans = retrieval_service.search(query="all clauses obligations", tenant_id=tenant_id, top_k=10)
     return LawyerHandoffService.generate_handoff_pack(tenant_docs, tenant_clauses, spans)
@@ -309,10 +320,8 @@ def generate_checklist(user: AuthenticatedUser = Depends(verify_firebase_token))
     Generates plain-English actionable checklist (things to negotiate, dates not to miss, risk red flags).
     """
     tenant_id = user.tenant_id
-    tenant_docs = [meta for meta in documents_store.values() if meta.tenant_id == tenant_id]
-    tenant_clauses = []
-    for d in tenant_docs:
-        tenant_clauses.extend(clauses_store.get(d.document_id, []))
+    tenant_docs = tenant_documents_store.get(tenant_id, [])
+    tenant_clauses = tenant_clauses_store.get(tenant_id, [])
 
     return LawyerHandoffService.generate_plain_english_checklist(tenant_docs, tenant_clauses)
 
