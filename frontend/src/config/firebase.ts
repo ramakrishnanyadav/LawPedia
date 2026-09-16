@@ -33,10 +33,20 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || ""
 };
 
-// Initialize Firebase safely
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const googleProvider = new GoogleAuthProvider();
+// Initialize Firebase safely with fallback for unconfigured/demo environments
+let app: any = null;
+let auth: any = null;
+let googleProvider: any = null;
+
+try {
+  if (firebaseConfig.apiKey) {
+    app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    googleProvider = new GoogleAuthProvider();
+  }
+} catch (e) {
+  console.warn("Firebase Auth initialized in offline/demo mode:", e);
+}
 
 export { app, auth, googleProvider };
 export { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, signOut as firebaseSignOut } from "firebase/auth";

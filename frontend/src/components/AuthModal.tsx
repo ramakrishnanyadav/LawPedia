@@ -25,6 +25,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
     setError(null);
 
     try {
+      if (!auth) {
+        onLoginSuccess({
+          ...DEMO_USER,
+          email: email || DEMO_USER.email,
+          displayName: displayName || email.split('@')[0] || DEMO_USER.displayName
+        });
+        onClose();
+        setLoading(false);
+        return;
+      }
       let fbUser;
       if (mode === 'login') {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
