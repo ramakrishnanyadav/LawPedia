@@ -9,6 +9,16 @@ from typing import Tuple
 from backend.config import settings
 from backend.schemas.eglr import DocumentMetadata, ClauseObject, RiskLevel
 
+_RE_TITLE = re.compile(r"^(?:CONTRACT|AGREEMENT|POLICY|MASTER SERVICES AGREEMENT|LEASE AGREEMENT|NON-DISCLOSURE AGREEMENT)[:\s]+([^\n]+)", re.IGNORECASE)
+_RE_PARTIES = re.compile(r"\b(?:Party A|Party B|Company|Client|Vendor|Contractor|Employer|Employee|Licensor|Licensee|Landlord|Tenant|Disclosing Party|Receiving Party)\b", re.IGNORECASE)
+_RE_JURISDICTION = re.compile(r"governed by the laws of (?:the State of |the Republic of )?([a-z\s]+)", re.IGNORECASE)
+_RE_EFFECTIVE_DATE = re.compile(r"effective as of ([a-z0-9,\s]+|\d{4}-\d{2}-\d{2})", re.IGNORECASE)
+_RE_SECTION_SPLIT = re.compile(r"\n(?=(?:SECTION|CLAUSE|\d+\.|\d+\))\s+)", re.IGNORECASE)
+_RE_SECTION_START = re.compile(r"^(?:SECTION|CLAUSE|\d+\.|\d+\))", re.IGNORECASE)
+_RE_SECTION_TITLE = re.compile(r"^((?:SECTION|CLAUSE|\d+\.|\d+\))\s*[a-z0-9.\s_:-]+)", re.IGNORECASE)
+_RE_RISK_MEDIUM = re.compile(r"\b(indemnify|liability|penalty|terminate|breach|confidential|jurisdiction|arbitration)\b", re.IGNORECASE)
+_RE_RISK_HIGH = re.compile(r"\b(unlimited liability|sole discretion|immediate termination|liquidated damages|forfeiture)\b", re.IGNORECASE)
+
 
 class IngestionService:
     """
@@ -32,17 +42,17 @@ class IngestionService:
 
     @staticmethod
     def _extract_header_info(content_text: str, filename: str) -> tuple[str, list[str], str, str]:
-        title_match = re.search(r"^(?:CONTRACT|AGREEMENT|POLICY|MASTER SERVICES AGREEMENT|LEASE AGREEMENT|NON-DISCLOSURE AGREEMENT)[:\s]+([^\n]+)", content_text, re.IGNORECASE)
+        title_match = _RE_TITLE.search(content_text)
         doc_title = title_match.group(1).strip() if title_match else filename.replace(".pdf", "").replace(".txt", "").replace("_", " ").title()
 
-        parties = list(set(re.findall(r"\b(?:Party A|Party B|Company|Client|Vendor|Contractor|Employer|Employee|Licensor|Licensee|Landlord|Tenant|Disclosing Party|Receiving Party)\b", content_text, re.IGNORECASE)))
+        parties = list(set(_RE_PARTIES.findall(content_text)))
         if not parties:
             parties = ["Party A", "Party B"]
 
-        jurisdiction_match = re.search(r"governed by the laws of (?:the State of |the Republic of )?([a-z\s]+)", content_text, re.IGNORECASE)
+        jurisdiction_match = _RE_JURISDICTION.search(content_text)
         jurisdiction = jurisdiction_match.group(1).strip() if jurisdiction_match else "General"
 
-        effective_date_match = re.search(r"effective as of ([a-z0-9,\s]+|\d{4}-\d{2}-\d{2})", content_text, re.IGNORECASE)
+        effective_date_match = _RE_EFFECTIVE_DATE.search(content_text)
         effective_date = effective_date_match.group(1).strip() if effective_date_match else "2026-01-01"
 
         return doc_title, parties, jurisdiction, effective_date
@@ -63,7 +73,7 @@ class IngestionService:
 
         doc_title, parties, jurisdiction, effective_date = IngestionService._extract_header_info(content_text, filename)
 
-        raw_sections = re.split(r"\n(?=(?:SECTION|CLAUSE|\d+\.|\d+\))\s+)", content_text, flags=re.IGNORECASE)
+        raw_sections = _RE_SECTION_SPLIT.split(content_text)
 
         clauses: list[ClauseObject] = []
         char_cursor = 0
@@ -74,13 +84,13 @@ class IngestionService:
             if not sec_text:
                 continue
 
-            if not re.search(r"^(?:SECTION|CLAUSE|\d+\.|\d+\))", sec_text, re.IGNORECASE) and len(sec_text) < 100:
+            if not _RE_SECTION_START.search(sec_text) and len(sec_text) < 100:
                 continue
 
             sec_lines = sec_text.split("\n", 1)
             header_line = sec_lines[0].strip()
 
-            sec_title_match = re.match(r"^((?:SECTION|CLAUSE|\d+\.|\d+\))\s*[a-z0-9.\s_:-]+)", header_line, re.IGNORECASE)
+            sec_title_match = _RE_SECTION_TITLE.match(header_line)
             sec_title = sec_title_match.group(1).strip() if sec_title_match else f"Clause {clause_idx}"
             
             clause_id = f"CLAUSE_{doc_id}_{clause_idx:03d}"
@@ -90,9 +100,9 @@ class IngestionService:
             page_estimate = max(1, (char_start // 1800) + 1)
 
             risk = RiskLevel.LOW
-            if re.search(r"\b(indemnify|liability|penalty|terminate|breach|confidential|jurisdiction|arbitration)\b", sec_text, re.IGNORECASE):
+            if _RE_RISK_MEDIUM.search(sec_text):
                 risk = RiskLevel.MEDIUM
-            if re.search(r"\b(unlimited liability|sole discretion|immediate termination|liquidated damages|forfeiture)\b", sec_text, re.IGNORECASE):
+            if _RE_RISK_HIGH.search(sec_text):
                 risk = RiskLevel.HIGH
 
             clauses.append(
@@ -127,3 +137,4 @@ class IngestionService:
         )
 
         return metadata, clauses
+
