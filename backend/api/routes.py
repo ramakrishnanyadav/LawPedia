@@ -4,6 +4,7 @@ Lawpedia FastAPI Router Endpoints
 
 from typing import Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, Depends
+from starlette.concurrency import run_in_threadpool
 from backend.schemas.eglr import (
     AskQueryRequest, AskQueryResponse, DocumentUploadResponse,
     ComparisonResult, LawyerHandoffPack, SupportStatus, ClaimVerification, FalsePremiseCheck,
@@ -96,8 +97,9 @@ async def upload_document(
         # 2. Sanitize prompt-injection data boundary
         content = SafetyGateway.sanitize_prompt_evidence(content)
 
-        # Parse document into clauses
-        metadata, clauses = IngestionService.parse_document(
+        # Parse document into clauses (CPU bound)
+        metadata, clauses = await run_in_threadpool(
+            IngestionService.parse_document,
             filename=fname,
             content_text=content,
             mime_type=mime,
@@ -105,19 +107,22 @@ async def upload_document(
             custom_version=document_version
         )
 
-        # Extract obligations & rights for each clause
-        for clause in clauses:
-            clause.obligations = LegalExtractionService.extract_obligations(clause)
-            clause.rights = LegalExtractionService.extract_rights(clause)
+        def _extract_and_index():
+            # Extract obligations & rights for each clause
+            for clause in clauses:
+                clause.obligations = LegalExtractionService.extract_obligations(clause)
+                clause.rights = LegalExtractionService.extract_rights(clause)
 
-        # Index in retrieval and graph
-        retrieval_service.index_document(metadata, clauses)
-        evidence_graph.add_document_subgraph(metadata, clauses)
+            # Index in retrieval and graph
+            retrieval_service.index_document(metadata, clauses)
+            evidence_graph.add_document_subgraph(metadata, clauses)
 
-        # Store in-memory and persist to SQLite disk database
-        documents_store[metadata.document_id] = metadata
-        clauses_store[metadata.document_id] = clauses
-        save_document_persistent(metadata, clauses)
+            # Store in-memory and persist to SQLite disk database
+            documents_store[metadata.document_id] = metadata
+            clauses_store[metadata.document_id] = clauses
+            save_document_persistent(metadata, clauses)
+
+        await run_in_threadpool(_extract_and_index)
 
         log_audit_event(
             event_type="DOCUMENT_UPLOAD",

@@ -14,16 +14,19 @@ class ComparisonService:
     """
 
     DIMENSIONS = [
-        ("Termination Notice", [r"\btermination\b", r"\bnotice period\b", r"\bcure period\b"]),
-        ("Liability Cap", [r"\bliability\b", r"\blimitation of liability\b", r"\bcap\b"]),
-        ("Payment & Fee Terms", [r"\bpayment\b", r"\binvoice\b", r"\bfees?\b", r"\bdue date\b"]),
-        ("Confidentiality Duration", [r"\bconfidential\b", r"\bnon-disclosure\b", r"\bsecrecy\b"]),
-        ("Governing Law & Forum", [r"\bgoverning law\b", r"\bjurisdiction\b", r"\bforum\b", r"\barbitration\b"]),
-        ("Indemnification Obligations", [r"\bindemnif\w*\b", r"\bhold harmless\b"]),
-        ("Intellectual Property Rights", [r"\bintellectual property\b", r"\bip rights\b", r"\bownership\b", r"\bpatent\b"]),
-        ("Dispute Resolution", [r"\bdispute\b", r"\bmediation\b", r"\barbitration\b"]),
-        ("Renewal & Extension", [r"\brenew\w*\b", r"\bextension\b", r"\bauto-renew\b"]),
-        ("Subcontracting & Assignment", [r"\bassignment\b", r"\bsubcontract\w*\b", r"\btransfer\b"])
+        (name, [re.compile(p, re.IGNORECASE) for p in patterns])
+        for name, patterns in [
+            ("Termination Notice", [r"\btermination\b", r"\bnotice period\b", r"\bcure period\b"]),
+            ("Liability Cap", [r"\bliability\b", r"\blimitation of liability\b", r"\bcap\b"]),
+            ("Payment & Fee Terms", [r"\bpayment\b", r"\binvoice\b", r"\bfees?\b", r"\bdue date\b"]),
+            ("Confidentiality Duration", [r"\bconfidential\b", r"\bnon-disclosure\b", r"\bsecrecy\b"]),
+            ("Governing Law & Forum", [r"\bgoverning law\b", r"\bjurisdiction\b", r"\bforum\b", r"\barbitration\b"]),
+            ("Indemnification Obligations", [r"\bindemnif\w*\b", r"\bhold harmless\b"]),
+            ("Intellectual Property Rights", [r"\bintellectual property\b", r"\bip rights\b", r"\bownership\b", r"\bpatent\b"]),
+            ("Dispute Resolution", [r"\bdispute\b", r"\bmediation\b", r"\barbitration\b"]),
+            ("Renewal & Extension", [r"\brenew\w*\b", r"\bextension\b", r"\bauto-renew\b"]),
+            ("Subcontracting & Assignment", [r"\bassignment\b", r"\bsubcontract\w*\b", r"\btransfer\b"])
+        ]
     ]
 
     @staticmethod
@@ -121,9 +124,9 @@ class ComparisonService:
         )
 
     @staticmethod
-    def _find_matching_clause(patterns: list[str], clauses: list[ClauseObject]) -> Optional[ClauseObject]:
+    def _find_matching_clause(patterns: list[re.Pattern], clauses: list[ClauseObject]) -> Optional[ClauseObject]:
         for c in clauses:
             for pat in patterns:
-                if re.search(pat, c.text, re.IGNORECASE) or re.search(pat, c.title, re.IGNORECASE):
+                if pat.search(c.text) or pat.search(c.title):
                     return c
         return None

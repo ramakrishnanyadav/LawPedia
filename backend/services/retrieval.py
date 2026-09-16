@@ -3,6 +3,7 @@ Hybrid Retrieval Engine (Real Dense Semantic Vectors + BM25 Lexical + RRF Rerank
 """
 
 import re
+import heapq
 from typing import Optional
 import numpy as np
 from backend.schemas.eglr import ClauseObject, DocumentMetadata, EvidenceSpan
@@ -54,6 +55,7 @@ class HybridRetrievalService:
         self.documents: dict[str, DocumentMetadata] = {}
         self.clauses: dict[str, list[ClauseObject]] = {}
         self.embedding_cache: dict[str, list[float]] = {}
+        self._tokenized_cache: dict[str, list[str]] = {}
         self._vocab: dict[str, int] = {}
 
     def get_model(self):
@@ -66,14 +68,29 @@ class HybridRetrievalService:
         """
         self.documents[metadata.document_id] = metadata
         self.clauses[metadata.document_id] = clauses
-        
-        # Precompute dense embedding vectors for clauses
-        for c in clauses:
-            words = re.findall(r"\w+", c.text.lower())
-            for w in words:
-                if w not in self._vocab:
-                    self._vocab[w] = len(self._vocab)
-            self.embedding_cache[c.clause_id] = self._compute_semantic_embedding(c.text)
+
+        model = self.get_model()
+        if model is not None and clauses:
+            texts = [c.text for c in clauses]
+            raw_embeddings = model.encode(texts, convert_to_numpy=True, batch_size=32)
+            for c, emb in zip(clauses, raw_embeddings):
+                norm = np.linalg.norm(emb)
+                normalized = (emb / norm) if norm > 0 else emb
+                self.embedding_cache[c.clause_id] = normalized.tolist()
+
+                words = re.findall(r"\w+", c.text.lower())
+                self._tokenized_cache[c.clause_id] = words
+                for w in words:
+                    if w not in self._vocab:
+                        self._vocab[w] = len(self._vocab)
+        else:
+            for c in clauses:
+                words = re.findall(r"\w+", c.text.lower())
+                self._tokenized_cache[c.clause_id] = words
+                for w in words:
+                    if w not in self._vocab:
+                        self._vocab[w] = len(self._vocab)
+                self.embedding_cache[c.clause_id] = self._compute_semantic_embedding(c.text)
 
     def _compute_semantic_embedding(self, text: str) -> list[float]:
         """
@@ -114,8 +131,7 @@ class HybridRetrievalService:
             return 0.0
         return float(dot / (norm_a * norm_b))
 
-    def _bm25_score(self, query_terms: list[str], text: str) -> float:
-        words = re.findall(r"\w+", text.lower())
+    def _bm25_score(self, query_terms: list[str], words: list[str]) -> float:
         score = 0.0
         for term in query_terms:
             count = words.count(term.lower())
@@ -151,22 +167,26 @@ class HybridRetrievalService:
         if not candidate_clauses:
             return []
 
+        # Vectorized cosine similarity (dot product of pre-normalized unit vectors)
+        vectors = np.array([
+            self.embedding_cache.get(c.clause_id) or self._compute_semantic_embedding(c.text)
+            for c, _ in candidate_clauses
+        ], dtype=np.float32)
+        query_arr = np.array(query_vec, dtype=np.float32)
+        v_scores = vectors @ query_arr
+
         scored_items = []
-        for c, meta in candidate_clauses:
-            c_vec = self.embedding_cache.get(c.clause_id) or self._compute_semantic_embedding(c.text)
-            v_score = self._cosine_similarity(query_vec, c_vec)
-            b_score = self._bm25_score(query_terms, c.text)
-
-            # Combined Reciprocal Rank Fusion / Hybrid score
-            hybrid_score = (v_score * 0.75) + (min(b_score / 5.0, 1.0) * 0.25)
-
+        for (c, meta), v_score in zip(candidate_clauses, v_scores):
+            words = self._tokenized_cache.get(c.clause_id) or re.findall(r"\w+", c.text.lower())
+            b_score = self._bm25_score(query_terms, words)
+            hybrid_score = (float(v_score) * 0.75) + (min(b_score / 5.0, 1.0) * 0.25)
             scored_items.append((hybrid_score, c, meta))
 
-        # Sort descending by hybrid score
-        scored_items.sort(key=lambda x: x[0], reverse=True)
+        # Heap top-K selection O(N log K) instead of full sort O(N log N)
+        top_items = heapq.nlargest(top_k, scored_items, key=lambda x: x[0])
 
         spans: list[EvidenceSpan] = []
-        for score, clause, meta in scored_items[:top_k]:
+        for score, clause, meta in top_items:
             sec_str = clause.section if (clause.section.startswith("Section") or clause.section == "General") else f"Section {clause.section}"
             citation_str = f"{sec_str}, page {clause.page}"
             spans.append(
