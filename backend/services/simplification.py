@@ -20,6 +20,19 @@ _CONSECUTIVE_LLM_ERRORS: int = 0
 _CIRCUIT_BREAKER_UNTIL: float = 0.0
 
 
+_REPLACEMENTS = [
+    (re.compile(r"\bshall\b", re.IGNORECASE), "must"),
+    (re.compile(r"\bherein\b", re.IGNORECASE), "in this document"),
+    (re.compile(r"\bthereof\b", re.IGNORECASE), "of it"),
+    (re.compile(r"\bhereto\b", re.IGNORECASE), "to this"),
+    (re.compile(r"\bnotwithstanding\b", re.IGNORECASE), "despite"),
+    (re.compile(r"\bindemnify and hold harmless\b", re.IGNORECASE), "protect from legal financial loss"),
+    (re.compile(r"\bterminate for convenience\b", re.IGNORECASE), "cancel at any time without special reason"),
+    (re.compile(r"\bliquidated damages\b", re.IGNORECASE), "agreed pre-set penalty amount"),
+    (re.compile(r"\bforce majeure\b", re.IGNORECASE), "unforeseeable major emergency event")
+]
+
+
 class LegalSimplificationService:
     """
     Transforms complex legalese into plain-language explanations strictly grounded
@@ -124,19 +137,8 @@ class LegalSimplificationService:
 
         # 3. Enhanced Clause-Aware Rule-Based Fallback (fallback_no_llm_configured)
         simplified = clean_text
-        replacements = {
-            r"\bshall\b": "must",
-            r"\bherein\b": "in this document",
-            r"\bthereof\b": "of it",
-            r"\bhereto\b": "to this",
-            r"\bnotwithstanding\b": "despite",
-            r"\bindemnify and hold harmless\b": "protect from legal financial loss",
-            r"\bterminate for convenience\b": "cancel at any time without special reason",
-            r"\bliquidated damages\b": "agreed pre-set penalty amount",
-            r"\bforce majeure\b": "unforeseeable major emergency event"
-        }
-        for pattern, rep in replacements.items():
-            simplified = re.sub(pattern, rep, simplified, flags=re.IGNORECASE)
+        for pat, rep in _REPLACEMENTS:
+            simplified = pat.sub(rep, simplified)
 
         clause_prefix = ""
         st_lower = section_title.lower()
