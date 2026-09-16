@@ -30,18 +30,18 @@ export function App() {
   const [isA11yModalOpen, setIsA11yModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [user, setUser] = useState<UserProfile | null>(DEMO_USER);
-  const [a11ySettings, setA11ySettings] = useState<AccessibilitySettings>(DEFAULT_A11Y_SETTINGS);
+  const [a11ySettings, setA11ySettings] = useState<AccessibilitySettings>(() => {
+    try {
+      const saved = localStorage.getItem('lawpedia_a11y_settings');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return DEFAULT_A11Y_SETTINGS;
+  });
 
   useEffect(() => {
     fetchDocuments();
-    const saved = localStorage.getItem('lawpedia_a11y_settings');
-    if (saved) {
-      try {
-        setA11ySettings(JSON.parse(saved));
-      } catch (e) {
-        console.error(e);
-      }
-    }
   }, []);
 
   const getAuthToken = () => user?.token || "";
@@ -56,9 +56,6 @@ export function App() {
       const data = await res.json();
       const docs = data.documents || [];
       setDocuments(docs);
-      if (docs.length > 0 && !selectedDocument) {
-        setSelectedDocument(docs[0]);
-      }
     } catch (err) {
       console.error(err);
     }
@@ -105,7 +102,7 @@ export function App() {
 
   return (
     <div
-      className={`min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans transition-all ${
+      className={`min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans ${
         a11ySettings.highContrast ? 'contrast-125' : ''
       }`}
       style={{

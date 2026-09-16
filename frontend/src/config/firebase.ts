@@ -34,19 +34,20 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase safely with fallback for unconfigured/demo environments
-let app: any = null;
-let auth: any = null;
-let googleProvider: any = null;
-
-try {
-  if (firebaseConfig.apiKey) {
-    app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    googleProvider = new GoogleAuthProvider();
+const initFirebase = () => {
+  if (!firebaseConfig.apiKey) {
+    return { app: null as any, auth: null as any, googleProvider: null as any };
   }
-} catch (e) {
-  console.warn("Firebase Auth initialized in offline/demo mode:", e);
-}
+  try {
+    const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const googleProvider = new GoogleAuthProvider();
+    return { app, auth, googleProvider };
+  } catch (e) {
+    console.warn("Firebase Auth initialized in offline/demo mode:", e);
+    return { app: null as any, auth: null as any, googleProvider: null as any };
+  }
+};
 
-export { app, auth, googleProvider };
+export const { app, auth, googleProvider } = initFirebase();
 export { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, signOut as firebaseSignOut } from "firebase/auth";
