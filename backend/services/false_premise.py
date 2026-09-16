@@ -3,14 +3,21 @@ from typing import Optional
 from backend.schemas.eglr import EvidenceSpan, FalsePremiseCheck
 from backend.services.safety import SafetyGateway
 
+_RE_DAYS = re.compile(r"\b(\d+)\s*(?:days?|months?)\b", re.IGNORECASE)
+_RE_CAP = re.compile(r"\$(\d+(?:,\d{3})*)")
+_RE_PCT = re.compile(r"\b(\d+(?:\.\d+)?)\%")
+_RE_STATE = re.compile(r"\b(california|delaware|new york|england|singapore|india|texas)\b", re.IGNORECASE)
+_RE_NET = re.compile(r"\bnet\s*(\d+)\b", re.IGNORECASE)
+_RE_AUDIT_FREQ = re.compile(r"\b(monthly|weekly|quarterly)\b", re.IGNORECASE)
+
 
 def _check_days_contradiction(query: str, sanitized_spans: list[tuple[EvidenceSpan, str]]) -> Optional[FalsePremiseCheck]:
-    query_days_match = re.search(r"\b(\d+)\s*(?:days?|months?)\b", query, re.IGNORECASE)
+    query_days_match = _RE_DAYS.search(query)
     if not query_days_match:
         return None
     assumed_days = int(query_days_match.group(1))
     for orig_span, sanitized_text in sanitized_spans:
-        ev_days_match = re.search(r"\b(\d+)\s*(?:days?|months?)\b", sanitized_text, re.IGNORECASE)
+        ev_days_match = _RE_DAYS.search(sanitized_text)
         if ev_days_match:
             actual_days = int(ev_days_match.group(1))
             if assumed_days != actual_days and abs(assumed_days - actual_days) > 1:
@@ -24,12 +31,12 @@ def _check_days_contradiction(query: str, sanitized_spans: list[tuple[EvidenceSp
 
 
 def _check_cap_contradiction(query: str, sanitized_spans: list[tuple[EvidenceSpan, str]]) -> Optional[FalsePremiseCheck]:
-    query_cap_match = re.search(r"\$(\d+(?:,\d{3})*)", query)
+    query_cap_match = _RE_CAP.search(query)
     if not query_cap_match:
         return None
     assumed_cap = query_cap_match.group(1).replace(",", "")
     for orig_span, sanitized_text in sanitized_spans:
-        ev_cap_match = re.search(r"\$(\d+(?:,\d{3})*)", sanitized_text)
+        ev_cap_match = _RE_CAP.search(sanitized_text)
         if ev_cap_match:
             actual_cap = ev_cap_match.group(1).replace(",", "")
             if assumed_cap != actual_cap:
@@ -43,12 +50,12 @@ def _check_cap_contradiction(query: str, sanitized_spans: list[tuple[EvidenceSpa
 
 
 def _check_pct_contradiction(query: str, sanitized_spans: list[tuple[EvidenceSpan, str]]) -> Optional[FalsePremiseCheck]:
-    query_pct_match = re.search(r"\b(\d+(?:\.\d+)?)\%", query)
+    query_pct_match = _RE_PCT.search(query)
     if not query_pct_match:
         return None
     assumed_pct = query_pct_match.group(1)
     for orig_span, sanitized_text in sanitized_spans:
-        ev_pct_match = re.search(r"\b(\d+(?:\.\d+)?)\%", sanitized_text)
+        ev_pct_match = _RE_PCT.search(sanitized_text)
         if ev_pct_match:
             actual_pct = ev_pct_match.group(1)
             if assumed_pct != actual_pct:
@@ -62,12 +69,12 @@ def _check_pct_contradiction(query: str, sanitized_spans: list[tuple[EvidenceSpa
 
 
 def _check_state_contradiction(query: str, sanitized_spans: list[tuple[EvidenceSpan, str]]) -> Optional[FalsePremiseCheck]:
-    query_state_match = re.search(r"\b(california|delaware|new york|england|singapore|india|texas)\b", query, re.IGNORECASE)
+    query_state_match = _RE_STATE.search(query)
     if not query_state_match:
         return None
     assumed_state = query_state_match.group(1).title()
     for orig_span, sanitized_text in sanitized_spans:
-        ev_state_match = re.search(r"\b(california|delaware|new york|england|singapore|india|texas)\b", sanitized_text, re.IGNORECASE)
+        ev_state_match = _RE_STATE.search(sanitized_text)
         if ev_state_match:
             actual_state = ev_state_match.group(1).title()
             if assumed_state != actual_state:
@@ -83,12 +90,12 @@ def _check_state_contradiction(query: str, sanitized_spans: list[tuple[EvidenceS
 def _check_net_contradiction(query: str, sanitized_spans: list[tuple[EvidenceSpan, str]]) -> Optional[FalsePremiseCheck]:
     if "net " not in query.lower():
         return None
-    query_net_match = re.search(r"\bnet\s*(\d+)\b", query, re.IGNORECASE)
+    query_net_match = _RE_NET.search(query)
     if not query_net_match:
         return None
     assumed_net = query_net_match.group(1)
     for orig_span, sanitized_text in sanitized_spans:
-        ev_net_match = re.search(r"\bnet\s*(\d+)\b", sanitized_text, re.IGNORECASE)
+        ev_net_match = _RE_NET.search(sanitized_text)
         if ev_net_match and ev_net_match.group(1) != assumed_net:
             actual_net = ev_net_match.group(1)
             return FalsePremiseCheck(
@@ -104,7 +111,7 @@ def _check_qualitative_contradictions(query: str, sanitized_spans: list[tuple[Ev
     q_lower = query.lower()
     for orig_span, sanitized_text in sanitized_spans:
         s_lower = sanitized_text.lower()
-        if "audit" in q_lower and re.search(r"\b(monthly|weekly|quarterly)\b", q_lower) and "annual audit" in s_lower:
+        if "audit" in q_lower and _RE_AUDIT_FREQ.search(q_lower) and "annual audit" in s_lower:
             return FalsePremiseCheck(
                 has_false_premise=True,
                 detected_premise="User query assumed frequent (monthly/weekly) audit rights.",
