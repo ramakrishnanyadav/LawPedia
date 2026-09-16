@@ -58,23 +58,26 @@ class SafetyGateway:
 
         return SafetyGateway.PROMPT_INJECTION_PATTERN.sub("[REDACTED_EMBEDDED_PROMPT_INJECTION]", clean_text)
 
+    # Named PII patterns: each tuple is (compiled_regex, replacement_label).
+    # Adding a new PII type is a one-line change here instead of a buried re.sub call.
+    _PII_PATTERNS: list[tuple[re.Pattern, str]] = [
+        (re.compile(r"\b\d{3}-\d{2}-\d{4}\b"), "[REDACTED_SSN]"),
+        (re.compile(r"\b\d{4}\s?\d{4}\s?\d{4}\b"), "[REDACTED_AADHAAR]"),
+        (re.compile(r"\b[A-Z]{5}\d{4}[A-Z]\b"), "[REDACTED_PAN]"),
+        (re.compile(r"\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b"), "[REDACTED_PHONE]"),
+        (re.compile(r"\b(?:\d[\s-]*){13,16}\b"), "[REDACTED_CC]"),
+    ]
+
     @staticmethod
     def redact_pii(text: str) -> str:
         """
         Redacts sensitive PII (Social Security Numbers, Aadhaar, PAN, Credit Cards, Phone Numbers).
+        Pattern list is defined in _PII_PATTERNS for auditability and extensibility.
         """
         if not text:
             return ""
-
-        # SSN / Aadhaar-like numbers
-        text = re.sub(r"\b\d{3}-\d{2}-\d{4}\b", "[REDACTED_SSN]", text)
-        text = re.sub(r"\b\d{4}\s?\d{4}\s?\d{4}\b", "[REDACTED_AADHAAR]", text)
-        # PAN-like uppercase alphanumeric
-        text = re.sub(r"\b[A-Z]{5}\d{4}[A-Z]\b", "[REDACTED_PAN]", text)
-        # Phone
-        text = re.sub(r"\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b", "[REDACTED_PHONE]", text)
-        # Credit Card
-        text = re.sub(r"\b(?:\d[\s-]*){13,16}\b", "[REDACTED_CC]", text)
+        for pattern, label in SafetyGateway._PII_PATTERNS:
+            text = pattern.sub(label, text)
         return text
 
     @staticmethod
