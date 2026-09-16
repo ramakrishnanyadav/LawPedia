@@ -107,11 +107,16 @@ if os.path.exists(frontend_dist):
         if full_path.startswith("api") or full_path in ("health", "ready", "metrics", "docs", "openapi.json", "redoc"):
             raise HTTPException(status_code=404, detail="API route not found")
 
-        file_path = os.path.join(frontend_dist, full_path)
-        if os.path.isfile(file_path):
-            return FileResponse(file_path)
+        safe_base = os.path.realpath(frontend_dist)
+        target_path = os.path.realpath(os.path.join(safe_base, full_path))
 
-        index_path = os.path.join(frontend_dist, "index.html")
+        if not target_path.startswith(safe_base + os.sep) and target_path != safe_base:
+            raise HTTPException(status_code=400, detail="Access denied: Path traversal detected")
+
+        if os.path.isfile(target_path):
+            return FileResponse(target_path)
+
+        index_path = os.path.join(safe_base, "index.html")
         if os.path.isfile(index_path):
             return FileResponse(index_path)
 
