@@ -24,8 +24,8 @@ logger = logging.getLogger("lawpedia")
 async def lifespan(app: FastAPI):
     try:
         seed_demo_data()
-    except Exception as err:
-        logger.error(f"Notice: Demo data seeding encountered an issue during startup: {err}")
+    except Exception:
+        logger.exception("Notice: Demo data seeding encountered an issue during startup")
     yield
 
 
