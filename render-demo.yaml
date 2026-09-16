@@ -1,10 +1,11 @@
-# Render.com Blueprint Specification for LawPedia
+# Render.com Blueprint — LawPedia PUBLIC DEMO SERVICE
+# This is a SEPARATE service from render.yaml (production).
+# Demo mode is EXPLICITLY opted-in here. Never copy these env vars to production.
 # https://render.com/docs/blueprint-spec
 
 services:
-  # Production Full-Stack Web Service (FastAPI + Built React Static Assets)
   - type: web
-    name: lawpedia-platform
+    name: lawpedia-demo
     runtime: python
     region: oregon
     plan: free
@@ -13,11 +14,13 @@ services:
     healthCheckPath: /health
     envVars:
       - key: ENV
-        value: production
+        value: staging
       - key: DEBUG
         value: "False"
       - key: LAWPEDIA_DEMO_MODE
-        value: "false"
+        value: "true"
+      - key: LAWPEDIA_DEMO_TOKEN
+        value: lawpedia_demo_token_2026
       - key: LAWPEDIA_SECRET_KEY
         generateValue: true
       - key: LAWPEDIA_LIGHTWEIGHT_MODE

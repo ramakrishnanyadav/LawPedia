@@ -30,8 +30,10 @@ class Settings(BaseModel):
     ALLOWED_MIME_TYPES: list[str] = ["application/pdf", "text/plain", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
     
     # Demo Mode Configuration (Controlled via Environment Variables)
-    LAWPEDIA_DEMO_MODE: bool = os.getenv("LAWPEDIA_DEMO_MODE", "true").lower() in ("true", "1", "t")
-    LAWPEDIA_DEMO_TOKEN: str = os.getenv("LAWPEDIA_DEMO_TOKEN", "lawpedia_demo_token_2026")
+    # IMPORTANT: Default is FALSE — demo mode must be explicitly opted-in per environment.
+    # Never rely on default in production. Use render-demo.yaml for public demo deployments.
+    LAWPEDIA_DEMO_MODE: bool = os.getenv("LAWPEDIA_DEMO_MODE", "false").lower() in ("true", "1", "t")
+    LAWPEDIA_DEMO_TOKEN: str = os.getenv("LAWPEDIA_DEMO_TOKEN", "")
     DEFAULT_TENANT_ID: str = os.getenv("DEFAULT_TENANT_ID", "tenant_lawpedia_demo")
 
     # Retrieval & RAG

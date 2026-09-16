@@ -3,6 +3,7 @@ Plain-Language Legal Simplification Engine (Grounded In Evidence Spans)
 """
 
 import re
+import logging
 from typing import Optional
 from backend.schemas.eglr import EvidenceSpan
 from backend.services.safety import SafetyGateway
@@ -11,6 +12,8 @@ from backend.services.safety import SafetyGateway
 import time
 import os
 from backend.config import settings
+
+_logger = logging.getLogger("lawpedia.simplification")
 
 _TENANT_REQUEST_TIMESTAMPS: dict[str, list[float]] = {}
 _CONSECUTIVE_LLM_ERRORS: int = 0
@@ -74,7 +77,7 @@ class LegalSimplificationService:
                 return f"PLAIN SUMMARY ({reading_level.upper()} LEVEL) [MODE: LLM_OPENAI]: {response.choices[0].message.content.strip()}"
         except Exception as err:
             LegalSimplificationService._record_llm_failure()
-            print("Notice: OpenAI API simplification fallback:", err)
+            _logger.warning("Notice: OpenAI API simplification fallback: %s", err)
         return None
 
     @staticmethod
@@ -97,7 +100,7 @@ class LegalSimplificationService:
                 return f"PLAIN SUMMARY ({reading_level.upper()} LEVEL) [MODE: LLM_ANTHROPIC]: {response.content[0].text.strip()}"
         except Exception as err:
             LegalSimplificationService._record_llm_failure()
-            print("Notice: Anthropic API simplification fallback:", err)
+            _logger.warning("Notice: Anthropic API simplification fallback: %s", err)
         return None
 
     @staticmethod

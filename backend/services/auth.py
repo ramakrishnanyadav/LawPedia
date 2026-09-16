@@ -6,6 +6,7 @@ from typing import Optional
 from fastapi import Header, HTTPException, status, Depends
 from pydantic import BaseModel
 import os
+import logging
 
 try:
     import firebase_admin
@@ -15,7 +16,9 @@ try:
     _FIREBASE_SDK_READY = True
 except Exception as e:
     _FIREBASE_SDK_READY = False
-    print("Notice: Firebase Admin SDK running in local development verification mode.")
+    logging.getLogger("lawpedia.auth").warning(
+        "Notice: Firebase Admin SDK running in local development verification mode: %s", e
+    )
 
 
 class AuthenticatedUser(BaseModel):
@@ -32,7 +35,7 @@ def set_user_tenant_claim(uid: str, tenant_id: str):
         try:
             firebase_auth.set_custom_user_claims(uid, {"tenant_id": tenant_id})
         except Exception as e:
-            print("Notice: set_custom_user_claims failed:", e)
+            logging.getLogger("lawpedia.auth").warning("Notice: set_custom_user_claims failed: %s", e)
 
 
 def verify_firebase_token(authorization: Optional[str] = Header(None)) -> AuthenticatedUser:
