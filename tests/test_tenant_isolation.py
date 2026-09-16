@@ -81,9 +81,13 @@ def test_tenant_handoff_pack_isolation():
     assert "Beta_Contract.txt" not in pack_alpha.relevant_documents
 
 
-def test_unauthenticated_api_request_rejected_401():
+def test_unauthenticated_api_request_rejected_401(monkeypatch):
     from fastapi.testclient import TestClient
     from backend.main import app
+    from backend.config import settings
+
+    monkeypatch.setattr(settings, "LAWPEDIA_DEMO_MODE", True)
+    monkeypatch.setattr(settings, "LAWPEDIA_DEMO_TOKEN", "lawpedia_demo_token_2026")
 
     client = TestClient(app)
     
@@ -110,9 +114,13 @@ def test_unauthenticated_api_request_rejected_401():
     assert res_garbage.status_code == 401
 
 
-def test_graph_api_tenant_isolation():
+def test_graph_api_tenant_isolation(monkeypatch):
     from fastapi.testclient import TestClient
     from backend.main import app
+    from backend.config import settings
+
+    monkeypatch.setattr(settings, "LAWPEDIA_DEMO_MODE", True)
+    monkeypatch.setattr(settings, "LAWPEDIA_DEMO_TOKEN", "lawpedia_demo_token_2026")
 
     client = TestClient(app)
     headers = {"Authorization": "Bearer lawpedia_demo_token_2026"}

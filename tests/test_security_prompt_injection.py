@@ -35,9 +35,13 @@ def test_pii_redaction():
     assert "123-45-6789" not in redacted
 
 
-def test_live_api_upload_redacts_pii_end_to_end():
+def test_live_api_upload_redacts_pii_end_to_end(monkeypatch):
     from fastapi.testclient import TestClient
     from backend.main import app
+    from backend.config import settings
+
+    monkeypatch.setattr(settings, "LAWPEDIA_DEMO_MODE", True)
+    monkeypatch.setattr(settings, "LAWPEDIA_DEMO_TOKEN", "lawpedia_demo_token_2026")
 
     client = TestClient(app)
     headers = {"Authorization": "Bearer lawpedia_demo_token_2026"}
